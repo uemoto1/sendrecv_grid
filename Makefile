@@ -1,28 +1,26 @@
+TARGET = sendrecv_grid
 
-TARGET = test
+FC = mpif90
+FLAGS = -cpp -fopenmp -Wall  -DSALMON_USE_MPI 
+
+# FC = mpiifort
+# FLAGS =  -fpp -xMIC-AVX512 -qopenmp  -warn all  -DSALMON_USE_MPI
+
 OBJS = \
 misc/unusedvar.o \
 parallel/salmon_communication.o \
 parallel/salmon_parallel.o \
-test.o
+test00.o \
+main.o
 
-FFLAGS = -O3 -cpp -fopenmp -Wall  -DSALMON_USE_MPI 
-
-FC = mpif90
 
 .SUFFIXES: .f90
 
 %.o: %.f90
-	$(FC) -c -o $@ $^ $(FFLAGS)
-
-%.mod: %.f90 %.o
-	@:
+	$(FC) -c -o $@ $^ $(FLAGS)
 
 $(TARGET): $(OBJS)
-	$(FC) -o $@ $^ $(FFLAGS) $(LIBS)
-
-# item.o: using_module.mod
-
+	$(FC) -o $@ $^ $(FLAGS)
 
 clean:
 	rm $(TARGET) $(OBJS)
