@@ -50,7 +50,7 @@ module sendrecv_grid
     use pack_unpack
     implicit none
     type(s_sendrecv_grid), intent(inout) :: srg
-    type(s_rgrid),         intent(in)    :: rg
+    type(s_rgrid),         intent(inout) :: rg
     type(s_wavefunction),  intent(inout) :: wf
 
     integer :: iup,idw,jup,jdw,kup,kdw
@@ -63,7 +63,7 @@ module sendrecv_grid
     kup = srg%kup_array(1)
     kdw = srg%kdw_array(1)
 
-    srg%iup_array(1:3) = 0
+    kdw = srg%nxshape(1) 
     
     !send from idw to iup
     if(iup/=comm_proc_null)then
