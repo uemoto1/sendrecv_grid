@@ -6,6 +6,9 @@ OBJS = \
 misc/unusedvar.o \
 parallel/salmon_communication.o \
 parallel/salmon_parallel.o \
+common/structures.o \
+common/pack_unpack.o \
+common/sendrecv_grid.o \
 test00.o \
 main.o
 
