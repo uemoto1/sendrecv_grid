@@ -111,27 +111,6 @@ module structures
     real(8),allocatable :: force(:,:) ! force(1:3,1:NI)
   end type s_force
 
-  type s_sendrecv_grid
-    integer :: iup_array(1:4)
-    integer :: idw_array(1:4)
-    integer :: jup_array(1:4)
-    integer :: jdw_array(1:4)
-    integer :: kup_array(1:4)
-    integer :: kdw_array(1:4)
-    real(8), allocatable :: r_srmatbox1_x_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox3_x_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox1_y_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox3_y_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox1_z_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox3_z_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox1_x_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox3_x_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox1_y_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox3_y_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox1_z_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox3_z_3d(:,:,:)
-  end type s_sendrecv_grid
-
 contains
 
 # define DEAL(x) if(allocated(x)) deallocate(x)
