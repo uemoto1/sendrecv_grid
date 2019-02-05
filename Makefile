@@ -1,3 +1,5 @@
+include Makefile.inc
+
 TARGET = sendrecv_grid
 
 OBJS = \
