@@ -18,8 +18,8 @@ module sendrecv_grid
 
 
   type s_sendrecv_grid
-    integer :: nshape(1:3)
-    integer :: nrange(1:3,1:1)
+    integer :: nxshape(1:3)
+    integer :: nxrange(1:3,1:1)
     integer :: ireq(1:12)
     integer :: iup_array(1:4)
     integer :: idw_array(1:4)
@@ -55,6 +55,7 @@ module sendrecv_grid
 
     integer :: iup,idw,jup,jdw,kup,kdw
   
+
     iup = srg%iup_array(1)
     idw = srg%idw_array(1)
     jup = srg%jup_array(1)
@@ -66,74 +67,74 @@ module sendrecv_grid
     
     !send from idw to iup
     if(iup/=comm_proc_null)then
-      call pack_data(srg%nshape(1:3), srg%nrange, wf%rwf, srmatbox1_x_3d)
+      call pack_data(srg%nxshape(1:3), srg%nxrange, wf%rwf, srmatbox1_x_3d)
     end if
     call comm_start_all(srg%ireq(1:2))
 
     !send from idw to iup
     if(iup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox1_x_3d)
+      call pack_data(srg%nxshape, srg%nxrange, srg%rwf, srmatbox1_x_3d)
     end if
     call comm_start_all(srg%ireq(1:2))
   
     !send from iup to idw
     if(idw/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox3_x_3d)
+      call pack_data(srg%nxshape, srg%nxrange, srg%rwf, srmatbox3_x_3d)
     end if
     call comm_start_all(srg%ireq(3:4))
   
     !send from jdw to jup
     if(jup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox1_y_3d)
+      call pack_data(srg%nxshape, srg%nxrange, srg%rwf, srmatbox1_y_3d)
     end if
     call comm_start_all(srg%ireq(5:6))
   
     !send from jup to jdw
     if(jdw/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox3_y_3d)
+      call pack_data(srg%nxshape, srg%nxrange, srg%rwf, srmatbox3_y_3d)
     end if
     call comm_start_all(srg%ireq(7:8))
   
     !send from kdw to kup
     if(kup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox1_z_3d)
+      call pack_data(srg%nxshape, srg%nxrange, srg%rwf, srmatbox1_z_3d)
     end if
     call comm_start_all(srg%ireq(9:10))
   
     !send from kup to kdw
     if(kdw/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox3_z_3d)
+      call pack_data(srg%nxshape, srg%nxrange, srg%rwf, srmatbox3_z_3d)
     end if
     call comm_start_all(srg%ireq(11:12))
   
     call comm_wait_all(srg%ireq(1:2))
     if(idw/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srmatbox2_x_3d, srg%rwf)
+      call unpack_data(srg%nxshape, srg%nxrange, srmatbox2_x_3d, srg%rwf)
     end if
   
     call comm_wait_all(srg%ireq(3:4))
     if(iup/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srmatbox4_x_3d, srg%rwf)
+      call unpack_data(srg%nxshape, srg%nxrange, srmatbox4_x_3d, srg%rwf)
     end if
   
     call comm_wait_all(srg%ireq(5:6))
     if(jdw/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srmatbox2_y_3d, srg%rwf)
+      call unpack_data(srg%nxshape, srg%nxrange, srmatbox2_y_3d, srg%rwf)
     end if
   
     call comm_wait_all(srg%ireq(7:8))
     if(jup/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srmatbox4_y_3d, srg%rwf)
+      call unpack_data(srg%nxshape, srg%nxrange, srmatbox4_y_3d, srg%rwf)
     end if
   
     call comm_wait_all(srg%ireq(9:10))
     if(kdw/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srmatbox2_z_3d, srg%rwf)
+      call unpack_data(srg%nxshape, srg%nxrange, srmatbox2_z_3d, srg%rwf)
     end if
   
     call comm_wait_all(srg%ireq(11:12))
     if(kup/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srmatbox4_z_3d, srg%rwf)
+      call unpack_data(srg%nxshape, srg%nxrange, srmatbox4_z_3d, srg%rwf)
     end if
 
     return
