@@ -13,145 +13,125 @@
 !  See the License for the specific language governing permissions and
 !  limitations under the License.
 !
+#define FLIP2(i) 3-i
+
 module sendrecv_grid
   implicit none
 
+  !! TODO: Move type defination to "common/structures.f90"
+  type s_srmatbox7d
+    real(8), allocatable :: rbuf(:, :, :, :, :, :, :)
+    complex(8), allocatable :: cbuf(:, :, :, :, :, :, :)
+    type(array_range) :: nshape(7)
+  end type s_srmatbox7d
 
+  !! TODO: Move type defination to "common/structures.f90"
   type s_sendrecv_grid
-    integer :: nshape(1:3)
-    integer :: nrange(1:3,1:1)
-    integer :: ireq(1:12)
-    integer :: iup_array(1:4)
-    integer :: idw_array(1:4)
-    integer :: jup_array(1:4)
-    integer :: jdw_array(1:4)
-    integer :: kup_array(1:4)
-    integer :: kdw_array(1:4)
-    ! Temporaly buffer for persistent communication:
-    real(8), allocatable :: r_srmatbox1_x_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox3_x_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox1_y_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox3_y_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox1_z_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox3_z_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox2_x_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox4_x_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox2_y_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox4_y_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox2_z_3d(:,:,:)
-    real(8), allocatable :: r_srmatbox4_z_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox1_x_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox3_x_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox1_y_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox3_y_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox1_z_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox3_z_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox2_x_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox4_x_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox2_y_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox4_y_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox2_z_3d(:,:,:)
-    complex(16), allocatable :: c_srmatbox4_z_3d(:,:,:)
+    !! Type information
+    logical :: is_complex 
+
+    !! Communicator:
+    integer :: icomm
+
+    !! Neightboring MPI proc id:
+    integer :: neig(1:3, 1:2) !! 1=x/2=y/3=z, 1=down/2=up
+    ! integer :: iup_array(1)
+    ! integer :: idw_array(1)
+    ! integer :: jup_array(1)
+    ! integer :: jdw_array(1)
+    ! integer :: kup_array(1)
+    ! integer :: kdw_array(1)
+
+    !! Array shape
+    type(array_range) :: nshape(7)
+    !type(array_shape) :: nrange(1:3,1:3)
+
+    !! Communication requests:
+    integer :: ireq(1:3, 1:2, 1:2) !! 1=x/2=y/3=z, 1=downward/2=upward, 1=send/2=recv
+    !integer :: ireq(1:12)
+    
+    !! Neightboring mpi nodes (1=x/2=y/3=z, 1=down/2=up, 1=src/2=dst)
+    type(s_srmatbox7d) :: srmatbox7d(1:3, 1:2, 1:2)
+    ! real(8), allocatable :: srmatbox1_x_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox2_x_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox3_x_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox4_x_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox1_y_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox2_y_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox3_y_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox4_y_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox1_z_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox2_z_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox3_z_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox4_z_3d(:,:,:)
+    ! real(8), allocatable :: srmatbox1_x_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox2_x_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox3_x_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox4_x_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox1_y_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox2_y_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox3_y_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox4_y_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox1_z_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox2_z_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox3_z_5d(:,:,:,:,:)
+    ! real(8), allocatable :: srmatbox4_z_5d(:,:,:,:,:)
+
   end type s_sendrecv_grid
 
   contains
-  subroutine sendrecv(srg, rg, wf)
-    use structures, only: s_rgrid, s_wavefunction
-    ! use salmon_parallel, only 
-    use salmon_communication, only: comm_start_all, comm_proc_null
+
+  subroutine pack_srmatbox7d(src, dst)
     use pack_unpack
+    implicit none
+
+    return
+  end subroutine
+
+  subroutine unpack_srmatbox7d(src, dst)
+    use pack_unpack
+    implicit none
+    return
+  end subroutine
+
+
+  subroutine sendrecv7d(srg, rg, wf)
+    use structures, only: s_rgrid, s_wavefunction
+    use salmon_communication, only: comm_start_all, comm_proc_null
     implicit none
     type(s_sendrecv_grid), intent(inout) :: srg
     type(s_rgrid),         intent(in)    :: rg
     type(s_wavefunction),  intent(inout) :: wf
 
-    integer :: iup,idw,jup,jdw,kup,kdw
-  
+    integer :: idim, idir
 
+    !! SEND overlapped region:
+    do idim = 1, 3 !! 1=x, 2=y, 3=z
+      do idir = 1, 2 !! 1=down, 2=up
+        if (srg%neig(idim, idir) /= comm_proc_null) then
+          call pack_srmatbox(srg%nrange(idim, idir), wf, srg%srmatbox(idim, idir))
+        end if
+        call comm_start_all(srg%ireq(idim, idir, 1:2))
+      end do
+    end do
 
-    iup = srg%iup_array(1)
-    idw = srg%idw_array(1)
-    jup = srg%jup_array(1)
-    jdw = srg%jdw_array(1)
-    kup = srg%kup_array(1)
-    kdw = srg%kdw_array(1)
-
-    srg%iup_array(1:3) = 0
-    
-    !send from idw to iup
-    if(iup/=comm_proc_null)then
-      call pack_data(srg%nshape(1:3), srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox1_x_3d)
-    end if
-    call comm_start_all(srg%ireq(1:2))
-
-    !send from idw to iup
-    if(iup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox1_x_3d)
-    end if
-    call comm_start_all(srg%ireq(1:2))
-  
-    !send from iup to idw
-    if(idw/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox3_x_3d)
-    end if
-    call comm_start_all(srg%ireq(3:4))
-  
-    !send from jdw to jup
-    if(jup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox1_y_3d)
-    end if
-    call comm_start_all(srg%ireq(5:6))
-  
-    !send from jup to jdw
-    if(jdw/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox3_y_3d)
-    end if
-    call comm_start_all(srg%ireq(7:8))
-  
-    !send from kdw to kup
-    if(kup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox1_z_3d)
-    end if
-    call comm_start_all(srg%ireq(9:10))
-  
-    !send from kup to kdw
-    if(kdw/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf(:,:,:,1,1,1,1), srg%r_srmatbox3_z_3d)
-    end if
-    call comm_start_all(srg%ireq(11:12))
-  
-    call comm_wait_all(srg%ireq(1:2))
-    if(idw/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srg%r_srmatbox2_x_3d, wf%rwf(:,:,:,1,1,1,1))
-    end if
-  
-    call comm_wait_all(srg%ireq(3:4))
-    if(iup/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srg%r_srmatbox4_x_3d, wf%rwf(:,:,:,1,1,1,1))
-    end if
-  
-    call comm_wait_all(srg%ireq(5:6))
-    if(jdw/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srg%r_srmatbox2_y_3d, wf%rwf(:,:,:,1,1,1,1))
-    end if
-  
-    call comm_wait_all(srg%ireq(7:8))
-    if(jup/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srg%r_srmatbox4_y_3d, wf%rwf(:,:,:,1,1,1,1))
-    end if
-  
-    call comm_wait_all(srg%ireq(9:10))
-    if(kdw/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srg%r_srmatbox2_z_3d, wf%rwf(:,:,:,1,1,1,1))
-    end if
-  
-    call comm_wait_all(srg%ireq(11:12))
-    if(kup/=comm_proc_null)then
-      call unpack_data(srg%nshape, srg%nrange, srg%r_srmatbox4_z_3d, wf%rwf(:,:,:,1,1,1,1))
-    end if
+    !! RECV overlapped region:
+    do idim = 1, 3 !! 1=x, 2=y, 3=z
+      do idir = 1, 2 !! 1=down, 2=up
+        call comm_wait_all(srg%ireq(idim, idir, 1:2))
+        if (srg%neig(idim, idir) /= comm_proc_null) then
+          call unpack_srmatbox(srg%nrange(idim, idir), srg%srmatbox(idim, idir), wf)
+        end if
+      end do
+    end do
 
     return
-  
-  end subroutine sendrecv
+  end subroutine sendrecv7d
+
+
+  subroutine sendrecv7d(srg, rg)
+
+
+  end subroutine
   
 end module sendrecv_grid
