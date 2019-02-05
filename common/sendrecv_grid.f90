@@ -18,15 +18,15 @@ module sendrecv_grid
 
 
   type s_sendrecv_grid
+    integer :: nshape(1:3)
+    integer :: nrange(1:3,1:1)
+    integer :: ireq(1:12)
     integer :: iup_array(1:4)
     integer :: idw_array(1:4)
     integer :: jup_array(1:4)
     integer :: jdw_array(1:4)
     integer :: kup_array(1:4)
     integer :: kdw_array(1:4)
-    integer :: nshape(1:3)
-    integer :: nrange(1:3,1:1)
-    integer :: ireq(1:12)
     ! Temporaly buffer for persistent communication:
     real(8), allocatable :: r_srmatbox1_x_3d(:,:,:)
     real(8), allocatable :: r_srmatbox3_x_3d(:,:,:)
@@ -47,6 +47,7 @@ module sendrecv_grid
     use structures, only: s_sendrecv_grid, s_rgrid, s_wavefunction
     ! use salmon_parallel, only 
     use salmon_communication, only: comm_start_all, comm_proc_null
+    use pack_unpack
     implicit none
     type(s_sendrecv_grid), intent(in)    :: srg
     type(s_rgrid),         intent(in)    :: rg
@@ -132,6 +133,8 @@ module sendrecv_grid
     if(kup/=comm_proc_null)then
       call unpack_data(srg%nshape, srg%nrange, srmatbox4_z_3d, srg%rwf)
     end if
+
+    return
   
   end subroutine sendrecv
   
