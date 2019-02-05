@@ -61,10 +61,12 @@ module sendrecv_grid
     jdw = srg%jdw_array(1)
     kup = srg%kup_array(1)
     kdw = srg%kdw_array(1)
+
+    srg%nshape(1:3) = 0
     
     !send from idw to iup
     if(iup/=comm_proc_null)then
-      call pack_data(srg%nshape, srg%nrange, wf%rwf, srmatbox1_x_3d)
+      call pack_data(srg%nshape(1:3), srg%nrange, wf%rwf, srmatbox1_x_3d)
     end if
     call comm_start_all(srg%ireq(1:2))
 
