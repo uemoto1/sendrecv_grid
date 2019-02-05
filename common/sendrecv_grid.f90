@@ -16,6 +16,7 @@
 module sendrecv_grid
   implicit none
 
+
   type s_sendrecv_grid
     integer :: iup_array(1:4)
     integer :: idw_array(1:4)
@@ -23,107 +24,115 @@ module sendrecv_grid
     integer :: jdw_array(1:4)
     integer :: kup_array(1:4)
     integer :: kdw_array(1:4)
+    integer :: nshape(1:3)
+    integer :: nrange(1:3,1:1)
+    integer :: ireq(1:12)
+    ! Temporaly buffer for persistent communication:
     real(8), allocatable :: r_srmatbox1_x_3d(:,:,:)
     real(8), allocatable :: r_srmatbox3_x_3d(:,:,:)
     real(8), allocatable :: r_srmatbox1_y_3d(:,:,:)
     real(8), allocatable :: r_srmatbox3_y_3d(:,:,:)
     real(8), allocatable :: r_srmatbox1_z_3d(:,:,:)
     real(8), allocatable :: r_srmatbox3_z_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox1_x_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox3_x_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox1_y_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox3_y_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox1_z_3d(:,:,:)
-    real(8), allocatable :: c_srmatbox3_z_3d(:,:,:)
+    complex(16), allocatable :: c_srmatbox1_x_3d(:,:,:)
+    complex(16), allocatable :: c_srmatbox3_x_3d(:,:,:)
+    complex(16), allocatable :: c_srmatbox1_y_3d(:,:,:)
+    complex(16), allocatable :: c_srmatbox3_y_3d(:,:,:)
+    complex(16), allocatable :: c_srmatbox1_z_3d(:,:,:)
+    complex(16), allocatable :: c_srmatbox3_z_3d(:,:,:)
   end type s_sendrecv_grid
 
-  subroutine sendrecv_grid(srg, rg, wf)
+  contains
+  subroutine sendrecv(srg, rg, wf)
+    use structures, only: s_sendrecv_grid, s_rgrid, s_wavefunction
+    ! use salmon_parallel, only 
+    use salmon_communication, only: comm_start_all, comm_proc_null
     implicit none
-    s_sendrecv_grid, intent(in)    :: srg
-    s_rgrid,         intent(in)    :: rg
-    s_wavefunction,  intent(inout) :: wf
+    type(s_sendrecv_grid), intent(in)    :: srg
+    type(s_rgrid),         intent(in)    :: rg
+    type(s_wavefunction),  intent(inout) :: wf
 
     integer :: iup,idw,jup,jdw,kup,kdw
   
-    iup = srg % iup_array(1)
-    idw = srg % idw_array(1)
-    jup = srg % jup_array(1)
-    jdw = srg % jdw_array(1)
-    kup = srg % kup_array(1)
-    kdw = srg % kdw_array(1)
+    iup = srg%iup_array(1)
+    idw = srg%idw_array(1)
+    jup = srg%jup_array(1)
+    jdw = srg%jdw_array(1)
+    kup = srg%kup_array(1)
+    kdw = srg%kdw_array(1)
     
     !send from idw to iup
     if(iup/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,1), tpsi, srmatbox1_x_3d)
+      call pack_data(srg%nshape, srg%nrange, wf%rwf, srmatbox1_x_3d)
     end if
-    call comm_start_all(ireq(1:2))
+    call comm_start_all(srg%ireq(1:2))
 
     !send from idw to iup
     if(iup/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,1), tpsi, srmatbox1_x_3d)
+      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox1_x_3d)
     end if
-    call comm_start_all(ireq(1:2))
+    call comm_start_all(srg%ireq(1:2))
   
     !send from iup to idw
     if(idw/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,2), tpsi, srmatbox3_x_3d)
+      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox3_x_3d)
     end if
-    call comm_start_all(ireq(3:4))
+    call comm_start_all(srg%ireq(3:4))
   
     !send from jdw to jup
     if(jup/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,3), tpsi, srmatbox1_y_3d)
+      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox1_y_3d)
     end if
-    call comm_start_all(ireq(5:6))
+    call comm_start_all(srg%ireq(5:6))
   
     !send from jup to jdw
     if(jdw/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,4), tpsi, srmatbox3_y_3d)
+      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox3_y_3d)
     end if
-    call comm_start_all(ireq(7:8))
+    call comm_start_all(srg%ireq(7:8))
   
     !send from kdw to kup
     if(kup/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,5), tpsi, srmatbox1_z_3d)
+      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox1_z_3d)
     end if
-    call comm_start_all(ireq(9:10))
+    call comm_start_all(srg%ireq(9:10))
   
     !send from kup to kdw
     if(kdw/=comm_proc_null)then
-      call pack_data(nshape(1:3), nrange(1:3,6), tpsi, srmatbox3_z_3d)
+      call pack_data(srg%nshape, srg%nrange, srg%rwf, srmatbox3_z_3d)
     end if
-    call comm_start_all(ireq(11:12))
+    call comm_start_all(srg%ireq(11:12))
   
-    call comm_wait_all(ireq(1:2))
+    call comm_wait_all(srg%ireq(1:2))
     if(idw/=comm_proc_null)then
-      call unpack_data(nshape(1:3), nrange(1:3,7), srmatbox2_x_3d, tpsi)
+      call unpack_data(srg%nshape, srg%nrange, srmatbox2_x_3d, srg%rwf)
     end if
   
-    call comm_wait_all(ireq(3:4))
+    call comm_wait_all(srg%ireq(3:4))
     if(iup/=comm_proc_null)then
-      call unpack_data(nshape(1:3), nrange(1:3,8), srmatbox4_x_3d, tpsi)
+      call unpack_data(srg%nshape, srg%nrange, srmatbox4_x_3d, srg%rwf)
     end if
   
-    call comm_wait_all(ireq(5:6))
+    call comm_wait_all(srg%ireq(5:6))
     if(jdw/=comm_proc_null)then
-      call unpack_data(nshape(1:3), nrange(1:3,9), srmatbox2_y_3d, tpsi)
+      call unpack_data(srg%nshape, srg%nrange, srmatbox2_y_3d, srg%rwf)
     end if
   
-    call comm_wait_all(ireq(7:8))
+    call comm_wait_all(srg%ireq(7:8))
     if(jup/=comm_proc_null)then
-      call unpack_data(nshape(1:3), nrange(1:3,10), srmatbox4_y_3d, tpsi)
+      call unpack_data(srg%nshape, srg%nrange, srmatbox4_y_3d, srg%rwf)
     end if
   
-    call comm_wait_all(ireq(9:10))
+    call comm_wait_all(srg%ireq(9:10))
     if(kdw/=comm_proc_null)then
-      call unpack_data(nshape(1:3), nrange(1:3,11), srmatbox2_z_3d, tpsi)
+      call unpack_data(srg%nshape, srg%nrange, srmatbox2_z_3d, srg%rwf)
     end if
   
-    call comm_wait_all(ireq(11:12))
+    call comm_wait_all(srg%ireq(11:12))
     if(kup/=comm_proc_null)then
-      call unpack_data(nshape(1:3), nrange(1:3,12), srmatbox4_z_3d, tpsi)
+      call unpack_data(srg%nshape, srg%nrange, srmatbox4_z_3d, srg%rwf)
     end if
   
-  end subroutine sendrecv_grid
+  end subroutine sendrecv
   
 end module sendrecv_grid
