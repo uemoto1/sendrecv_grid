@@ -49,7 +49,7 @@ module sendrecv_grid
     use salmon_communication, only: comm_start_all, comm_proc_null
     use pack_unpack
     implicit none
-    type(s_sendrecv_grid), intent(in)    :: srg
+    type(s_sendrecv_grid), intent(inout) :: srg
     type(s_rgrid),         intent(in)    :: rg
     type(s_wavefunction),  intent(inout) :: wf
 
