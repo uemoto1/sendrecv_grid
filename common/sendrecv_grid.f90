@@ -30,6 +30,9 @@ module sendrecv_grid
 
   !! TODO: Move type defination to "common/structures.f90"
   type s_sendrecv_grid
+
+    integer :: icomm
+
     !! Type:
     logical :: use_complex !! .true.:complex(8), .false.:real(8)
     logical :: use_corner !! .false.:orthogonal, .true.:non-orthogonal
