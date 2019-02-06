@@ -1,7 +1,7 @@
 ## ファイル構造
 ```
 ├── Makefile
-├── Makefile.inc -> ./Makefile.inc.gnu シンボリックリンク
+├── Makefile.inc -> ./Makefile.inc.gnu シンボリックリンクを作る
 ├── Makefile.inc.gnu
 ├── Makefile.inc.knl
 ├── README.md
@@ -25,13 +25,13 @@
 グリッド間通信の情報・永続通信用の一時変数を保持
 
 ```
-    integer :: icomm !!
-    logical :: use_complex !! .true.:complex(8), .false.:real(8)
-    logical :: use_corner !! .false.:orthogonal, .true.:non-orthogonal
-    integer :: neig(1:3, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward
-    integer :: ireq(1:3, 1:2, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward, 1:send,2:recv
-    type(s_wavefunction) :: srmatbox7d(1:3, 1:2, 1:2)
-    type(array_shape) :: nshape(1:3, 1:2, 1:7)
+integer :: icomm !! MPI group
+logical :: use_complex !! .true.:complex(8), .false.:real(8)
+logical :: use_corner !! .false.:orthogonal, .true.:non-orthogonal
+integer :: neig(1:3, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward
+integer :: ireq(1:3, 1:2, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward, 1:send,2:recv
+type(s_wavefunction) :: srmatbox7d(1:3, 1:2, 1:2)
+type(array_shape) :: nshape(1:3, 1:2, 1:7)
 ```
 
 - `use_complex`: 変数の複素数・実数判定
