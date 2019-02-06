@@ -20,6 +20,10 @@ module sendrecv_grid
 
   implicit none
 
+  public :: s_sendrecv_grid
+  public :: sendrecv7d
+
+
   integer, parameter :: iside_src = 1
   integer, parameter :: iside_dst = 2
 
