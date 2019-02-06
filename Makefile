@@ -1,6 +1,6 @@
 include Makefile.inc
 
-TARGET = sendrecv_grid
+TARGET = sendrecv_test
 
 OBJS = \
 misc/unusedvar.o \
@@ -22,4 +22,4 @@ $(TARGET): $(OBJS)
 	$(FC) -o $@ $^ $(FLAGS)
 
 clean:
-	rm $(TARGET) $(OBJS)
+	rm $(TARGET) $(OBJS) *.mod
