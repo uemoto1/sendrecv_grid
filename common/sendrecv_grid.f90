@@ -15,7 +15,6 @@
 !
 
 module sendrecv_grid
-  use structures, only: s_wavefunction
   use pack_unpack, only: array_shape
 
   implicit none
@@ -30,69 +29,40 @@ module sendrecv_grid
 
   !! TODO: Move type defination to "common/structures.f90"
   type s_sendrecv_grid
-
+    !! Communicator
     integer :: icomm
-
-    !! Type:
-    logical :: use_complex !! .true.:complex(8), .false.:real(8)
-    logical :: use_corner !! .false.:orthogonal, .true.:non-orthogonal
-
-    !! Neightboring MPI proc id:
-    integer :: neig(1:3, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward
-    ! integer :: iup_array(1)
-    ! integer :: idw_array(1)
-    ! integer :: jup_array(1)
-    ! integer :: jdw_array(1)
-    ! integer :: kup_array(1)
-    ! integer :: kdw_array(1)
-
-    !! Communication requests:
-    integer :: ireq(1:3, 1:2, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward, 1:send,2:recv
-    !integer :: ireq(1:12)
-    
-    !! pcomm cache (1:x,2:y,3:z, 1:up,2:down, 1=src/2=dst)
-    type(s_wavefunction) :: srmatbox7d(1:3, 1:2, 1:2)
-    ! real(8), allocatable :: srmatbox1_x_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox2_x_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox3_x_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox4_x_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox1_y_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox2_y_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox3_y_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox4_y_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox1_z_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox2_z_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox3_z_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox4_z_3d(:,:,:)
-    ! real(8), allocatable :: srmatbox1_x_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox2_x_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox3_x_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox4_x_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox1_y_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox2_y_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox3_y_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox4_y_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox1_z_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox2_z_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox3_z_5d(:,:,:,:,:)
-    ! real(8), allocatable :: srmatbox4_z_5d(:,:,:,:,:)
-  
-    !! Range (dim=1:x,2:y,3:z, dir=1:up,2:down, axis=1-7)
-    type(array_shape) :: nshape(1:3, 1:2, 1:7)
-    !type(array_shape) :: nrange(1:3,1:3)
-
+    !! Neightboring MPI id ( 1:x,2:y,3:z, 1:upward,2:downward):
+    integer :: neig(1:3, 1:2) 
+    !! Communication requests (1:x,2:y,3:z, 1:upward,2:downward, 1:send,2:recv):
+    integer :: ireq(1:3, 1:2, 1:2)
+    !! PComm cache (1:x,2:y,3:z, 1:upside,2:downside, 1:src/2:dst)
+    type(s_pcomm_cache4d) :: cache(1:3, 1:2, 1:2)
+    !! Range (dim=1:x,2:y,3:z, dir=1:upside,2:downside, axis=1-7)
+    type(array_shape) :: nshape(1:3, 1:2, 1:4)
   end type s_sendrecv_grid
+
+
+  type s_pcomm_cache4d
+    real(8), allocatable :: d(:, :, :, :)
+    real(8), allocatable :: z(:, :, :, :)
+  end type s_pcomm_cache4d
+
+
+  interface update_overlap
+  module procedure update_overlap_array4d_double
+  module procedure update_overlap_array4d_dcomplex
+  end interface
+
 
   contains
 
 
 
-  subroutine sendrecv7d(srg, wf)
-    use structures, only: s_rgrid, s_wavefunction
+  subroutine update_overlap_array4d_double(srg, data)
     use salmon_communication, only: comm_start_all, comm_wait_all, comm_proc_null
     implicit none
     type(s_sendrecv_grid), intent(inout) :: srg
-    type(s_wavefunction),  intent(inout) :: wf
+    real(8), intent(inout) :: data
 
     integer :: idim, idir
 
@@ -100,102 +70,104 @@ module sendrecv_grid
     do idim = 1, 3 !! 1:x,2:y,3:z
       do idir = 1, 2 !! 1:up,2:down
         if (srg%neig(idim, idir) /= comm_proc_null) then
-          call pack_smatbox7d(srg, wf, idim, idir)
+          call pack_cache(idim, idir)
         end if
-        call comm_start_all(srg%ireq(idim, idir, :))
+        call comm_start_all(srg%ireq(idim, idir, :)) !! SEND
       end do
     end do
 
     !! RECV overlapped region:
     do idim = 1, 3 !! 1:x,2:y,3:z
       do idir = 1, 2 !! 1:up,2:down
-        call comm_wait_all(srg%ireq(idim, idir, :))
+        call comm_wait_all(srg%ireq(idim, idir, :)) !! RECV
         if (srg%neig(idim, idir) /= comm_proc_null) then
-          call unpack_smatbox7d(srg, wf, idim, idir)
+          call unpack_cache(srg, wf, idim, idir)
         end if
       end do
     end do
     return
-  end subroutine sendrecv7d
+  contains
 
-  subroutine pack_smatbox7d(srg, wf, jdim, jdir)
-    use pack_unpack, only: copy_data
+    subroutine pack_cache()
+      use pack_unpack, only: copy_data
+      type(array_shape) :: r(1:4)
+      r(1:4) = srg%nshape(idim, idir, 1:4)
+      call copy_data( &
+        srg%cache(idim, idir, iside_src)%d, &
+        data(r(1)%nbeg:r(1)%nend, r(2)%nbeg:r(2)%nend, &
+             r(3)%nbeg:r(3)%nend, r(4)%nbeg:r(4)%nend) &
+      )
+    end subroutine pack_cache
+
+    subroutine unpack_cache()
+      use pack_unpack, only: copy_data
+      type(array_shape) :: r(1:4)
+      r(1:4) = srg%nshape(idim, idir, 1:4)
+      call copy_data( &
+        data(r(1)%nbeg:r(1)%nend, r(2)%nbeg:r(2)%nend, &
+             r(3)%nbeg:r(3)%nend, r(4)%nbeg:r(4)%nend), &
+        srg%cache(idim, idir, iside_dst)%d &
+      )
+    end subroutine unpack_cache
+
+  end subroutine update_overlap_array4d_double
+
+
+
+  subroutine update_overlap_array4d_dcomplex(srg, data)
+    use salmon_communication, only: comm_start_all, comm_wait_all, comm_proc_null
+    implicit none
     type(s_sendrecv_grid), intent(inout) :: srg
-    type(s_wavefunction),  intent(in)    :: wf
-    integer, intent(in) :: jdim, jdir
-    type(array_shape) :: r(1:7)
+    complex(8), intent(inout) :: data
 
-    r(1:7) = srg%nshape(jdim, jdir, 1:7)
-    
-    if (srg%use_complex) then
-      call copy_data( &
-        wf%zwf( &
-          r(1)%nbeg:r(1)%nend, &
-          r(2)%nbeg:r(2)%nend, &
-          r(3)%nbeg:r(3)%nend, &
-          r(4)%nbeg:r(4)%nend, &
-          r(5)%nbeg:r(5)%nend, &
-          r(6)%nbeg:r(6)%nend, &
-          r(7)%nbeg:r(7)%nend &
-        ), &
-        srg%srmatbox7d(jdim, jdir, iside_src)%zwf &
-      )
-    else
-      call copy_data( &
-        wf%rwf( &
-          r(1)%nbeg:r(1)%nend, &
-          r(2)%nbeg:r(2)%nend, &
-          r(3)%nbeg:r(3)%nend, &
-          r(4)%nbeg:r(4)%nend, &
-          r(5)%nbeg:r(5)%nend, &
-          r(6)%nbeg:r(6)%nend, &
-          r(7)%nbeg:r(7)%nend &
-        ), &
-        srg%srmatbox7d(jdim, jdir, iside_src)%rwf &
-      )
-    end if
+    integer :: idim, idir
+
+    !! SEND overlapped region:
+    do idim = 1, 3 !! 1:x,2:y,3:z
+      do idir = 1, 2 !! 1:up,2:down
+        if (srg%neig(idim, idir) /= comm_proc_null) then
+          call pack_cache(idim, idir)
+        end if
+        call comm_start_all(srg%ireq(idim, idir, :)) !! SEND
+      end do
+    end do
+
+    !! RECV overlapped region:
+    do idim = 1, 3 !! 1:x,2:y,3:z
+      do idir = 1, 2 !! 1:up,2:down
+        call comm_wait_all(srg%ireq(idim, idir, :)) !! RECV
+        if (srg%neig(idim, idir) /= comm_proc_null) then
+          call unpack_cache(srg, wf, idim, idir)
+        end if
+      end do
+    end do
     return
-  end subroutine pack_smatbox7d
+  contains
 
+    subroutine pack_cache()
+      use pack_unpack, only: copy_data
+      type(array_shape) :: r(1:4)
+      r(1:4) = srg%nshape(idim, idir, 1:4)
+      call copy_data( &
+        srg%cache(idim, idir, iside_src)%z, &
+        data(r(1)%nbeg:r(1)%nend, r(2)%nbeg:r(2)%nend, &
+             r(3)%nbeg:r(3)%nend, r(4)%nbeg:r(4)%nend) &
+      )
+    end subroutine pack_cache
 
-  subroutine unpack_smatbox7d(srg, wf, jdim, jdir)
-    use pack_unpack, only: copy_data
-    type(s_sendrecv_grid), intent(in)    :: srg
-    type(s_wavefunction),  intent(inout) :: wf
-    integer, intent(in) :: jdim, jdir
-    type(array_shape) :: r(1:7)
-
-    r(1:7) = srg%nshape(jdim, jdir, 1:7)
+    subroutine unpack_cache()
+      use pack_unpack, only: copy_data
+      type(array_shape) :: r(1:4)
+      r(1:4) = srg%nshape(idim, idir, 1:4)
+      call copy_data( &
+        data(r(1)%nbeg:r(1)%nend, r(2)%nbeg:r(2)%nend, &
+             r(3)%nbeg:r(3)%nend, r(4)%nbeg:r(4)%nend), &
+        srg%cache(idim, idir, iside_dst)%z &
+      )
+    end subroutine unpack_cache
     
-    if (srg%use_complex) then
-      call copy_data( &
-        srg%srmatbox7d(jdim, jdir, iside_dst)%zwf, &
-        wf%zwf( &
-          r(1)%nbeg:r(1)%nend, &
-          r(2)%nbeg:r(2)%nend, &
-          r(3)%nbeg:r(3)%nend, &
-          r(4)%nbeg:r(4)%nend, &
-          r(5)%nbeg:r(5)%nend, &
-          r(6)%nbeg:r(6)%nend, &
-          r(7)%nbeg:r(7)%nend &
-        ) &
-      )
-    else
-      call copy_data( &
-        srg%srmatbox7d(jdim, jdir, iside_dst)%rwf, &
-        wf%rwf( &
-          r(1)%nbeg:r(1)%nend, &
-          r(2)%nbeg:r(2)%nend, &
-          r(3)%nbeg:r(3)%nend, &
-          r(4)%nbeg:r(4)%nend, &
-          r(5)%nbeg:r(5)%nend, &
-          r(6)%nbeg:r(6)%nend, &
-          r(7)%nbeg:r(7)%nend &
-        ) &
-      )
-    end if
-    return
-  end subroutine unpack_smatbox7d
+  end subroutine update_overlap_array4d_dcomplex
+
   
 
 end module sendrecv_grid
