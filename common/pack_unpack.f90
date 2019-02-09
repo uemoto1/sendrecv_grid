@@ -46,8 +46,6 @@ module pack_unpack
     module procedure copy_data_3d_complex8
     module procedure copy_data_5d_real8
     module procedure copy_data_5d_complex8
-    module procedure copy_data_7d_real8
-    module procedure copy_data_7d_complex8
   end interface
 
 contains
@@ -329,84 +327,4 @@ contains
     end do
 !$omp end parallel do
   end subroutine
-
-
-
-  subroutine copy_data_7d_real8(src,dst)
-    implicit none
-    real(8), intent(in)  :: src(:,:,:,:,:,:,:)
-    real(8), intent(out) :: dst(:,:,:,:,:,:,:)
-    integer :: nx,ny,nz,nw,nl,nk,nm
-    integer :: ix,iy,iz,iw,il,ik,im
-
-    nm = size(src,7)
-    nk = size(src,6)
-    nl = size(src,5)
-    nw = size(src,4)
-    nz = size(src,3)
-    ny = size(src,2)
-    nx = size(src,1)
-
-!$omp parallel do collapse(6) default(none) &
-!$omp          private(ix,iy,iz,iw,il,ik,im) &
-!$omp          firstprivate(nx,ny,nz,nw,nl,nk,nm) &
-!$omp          shared(src,dst)
-    do ik=1,nk
-    do im=1,nm
-    do il=1,nl
-    do iw=1,nw
-    do iz=1,nz
-    do iy=1,ny
-    do ix=1,nx
-      dst(ix,iy,iz,iw,il,ik,im) = src(ix,iy,iz,iw,il,ik,im)
-    end do
-    end do
-    end do
-    end do
-    end do
-    end do
-    end do
-!$omp end parallel do
-  end subroutine
-
-  subroutine copy_data_7d_complex8(src,dst)
-    implicit none
-    complex(8), intent(in)  :: src(:,:,:,:,:,:,:)
-    complex(8), intent(out) :: dst(:,:,:,:,:,:,:)
-    integer :: nx,ny,nz,nw,nl,nk,nm
-    integer :: ix,iy,iz,iw,il,ik,im
-
-    nm = size(src,7)
-    nk = size(src,6)
-    nl = size(src,5)
-    nw = size(src,4)
-    nz = size(src,3)
-    ny = size(src,2)
-    nx = size(src,1)
-
-!$omp parallel do collapse(6) default(none) &
-!$omp          private(ix,iy,iz,iw,il,ik,im) &
-!$omp          firstprivate(nx,ny,nz,nw,nl,nk,nm) &
-!$omp          shared(src,dst)
-    do ik=1,nk
-    do im=1,nm
-    do il=1,nl
-    do iw=1,nw
-    do iz=1,nz
-    do iy=1,ny
-    do ix=1,nx
-      dst(ix,iy,iz,iw,il,ik,im) = src(ix,iy,iz,iw,il,ik,im)
-    end do
-    end do
-    end do
-    end do
-    end do
-    end do
-    end do
-!$omp end parallel do
-  end subroutine
-
-
-
-
 end module
