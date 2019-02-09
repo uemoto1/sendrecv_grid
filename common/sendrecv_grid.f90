@@ -39,13 +39,13 @@ module sendrecv_grid
   type s_sendrecv_grid
     ! Communicator
     integer :: icomm, myrank
-    ! Neightboring MPI id ( 1:x,2:y,3:z, 1:upside,2:downside):
+    ! Neightboring MPI id (1:x,2:y,3:z, 1:upside,2:downside):
     integer :: neig(1:3, 1:2) 
     ! Communication requests (1:x,2:y,3:z, 1:upside,2:downside, 1:send,2:recv):
     integer :: ireq(1:3, 1:2, 1:2)
     ! PComm cache (1:x,2:y,3:z, 1:upside,2:downside, 1:src/2:dst)
     type(s_pcomm_cache4d) :: cache(1:3, 1:2, 1:2)
-    ! Range (dim=1:x,2:y,3:z, dir=1:upside,2:downside, 1:src/2:dst, axis=1-7)
+    ! Range (dim=1:x,2:y,3:z, dir=1:upside,2:downside, 1:src/2:dst, axis=1...4)
     type(array_shape) :: nshape(1:3, 1:2, 1:2, 1:4)
   end type s_sendrecv_grid
 
@@ -54,6 +54,7 @@ module sendrecv_grid
   interface update_overlap
   module procedure update_overlap_array4d_double
   !module procedure update_overlap_array4d_dcomplex
+
   end interface
 
 
@@ -119,7 +120,7 @@ module sendrecv_grid
       call copy_data( &
         srg%cache(jdir, jside, imode_recv)%d_buf, &
         data(rdst(1)%nbeg:rdst(1)%nend, rdst(2)%nbeg:rdst(2)%nend, &
-             rdst(3)%nbeg:rdst(3)%nend, rdst(4)%nbeg:rdst(4)%nend), &
+             rdst(3)%nbeg:rdst(3)%nend, rdst(4)%nbeg:rdst(4)%nend) &
       )
     end subroutine unpack_cache
 
