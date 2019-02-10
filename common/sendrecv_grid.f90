@@ -14,7 +14,6 @@
 !  limitations under the License.
 !
 
-#define FLIP12(i) 3-i
 
 module sendrecv_grid
   use pack_unpack, only: array_shape
@@ -26,8 +25,8 @@ module sendrecv_grid
 
   integer, parameter :: iside_up   = 1
   integer, parameter :: iside_down = 2
-  integer, parameter :: iblock_send = 1
-  integer, parameter :: iblock_recv = 2
+  integer, parameter :: itype_send = 1
+  integer, parameter :: itype_recv = 2
 
   ! TODO: Move type defination to "common/structures.f90"
   type s_pcomm_cache4d
@@ -54,6 +53,7 @@ module sendrecv_grid
     ! Range (dim=1:x,2:y,3:z, dir=1:upside,2:downside, 1:src/2:dst, axis=1...3)
     integer :: is_block(1:3, 1:2, 1:2, 1:3)
     integer :: ie_block(1:3, 1:2, 1:2, 1:3)
+    logical :: pcomm_initialized
   end type s_sendrecv_grid4d
 
   interface update_overlap
@@ -64,7 +64,17 @@ module sendrecv_grid
 
   contains
 
+  integer function flip(i)
+    implicit none
+    integer, intent(in) :: i
+    flip = 3 - i
+  end function flip
 
+  integer function tag(idir, iside)
+    implicit none
+    integer, intent(in) :: idir, iside
+    tag = 2 * idir + iside
+  end function tag
 
   subroutine init_sendrecv_grid4d(srg, icomm, is, ie, ns, nd, neig)
     implicit none
@@ -98,17 +108,17 @@ module sendrecv_grid
       do iaxis = 1, 3 ! 1:x,2:y,3:z
         if (idir == iaxis) then
           ! upside-send (US) block:
-          is_block(idir, iside_up, iblock_send, idir) = ie(idir) + 1
-          ie_block(idir, iside_up, iblock_send, idir) = ie(idir) + nd
+          is_block(idir, iside_up, itype_send, idir) = ie(idir) + 1
+          ie_block(idir, iside_up, itype_send, idir) = ie(idir) + nd
           ! upside-recv (UR) block:
-          is_block(idir, iside_up, iblock_recv, idir) = ie(idir) - nd
-          ie_block(idir, iside_up, iblock_recv, idir) = ie(idir)
+          is_block(idir, iside_up, itype_recv, idir) = ie(idir) - nd
+          ie_block(idir, iside_up, itype_recv, idir) = ie(idir)
           ! downside-send (DS) block:
-          is_block(idir, iside_down, iblock_send, idir) = is(idir)
-          ie_block(idir, iside_down, iblock_send, idir) = is(idir) + nd
+          is_block(idir, iside_down, itype_send, idir) = is(idir)
+          ie_block(idir, iside_down, itype_send, idir) = is(idir) + nd
           ! downside-recv (DR) block:
-          is_block(idir, iside_down, iblock_recv, idir) = is(idir) - nd
-          ie_block(idir, iside_down, iblock_recv, idir) = is(idir) - 1
+          is_block(idir, iside_down, itype_recv, idir) = is(idir) - nd
+          ie_block(idir, iside_down, itype_recv, idir) = is(idir) - 1
         else
           is_block(idir, :, :, iaxis) = is(iaxis)
           ie_block(idir, :, :, iaxis) = ie(iaxis)
@@ -126,9 +136,8 @@ module sendrecv_grid
     srg%ie_block(:, :, :, :) = ie_block
     srg%icomm = icomm
     call comm_get_groupinfo(icomm, srg%myrank, idummy)
-
-    return
   end subroutine init_sendrecv_grid4d
+
 
   subroutine alloc_cache_real8(srg)
     implicit none
@@ -149,7 +158,6 @@ module sendrecv_grid
     end do
     ! Set pcomm_initialization flag
     srg%pcomm_initialized = .false.
-    return
   end subroutine
 
 
@@ -158,7 +166,6 @@ module sendrecv_grid
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
     real(8), intent(inout) :: data(:, :, :, :)
-
     integer :: idir, iside
 
     do idir = 1, 3 ! 1:x,2:y,3:z
@@ -187,45 +194,47 @@ module sendrecv_grid
         end if
       end do
     end do
-
     srg%pcomm_initialized = .true.
-    return
 
   contains
 
     subroutine init_pcomm(jdir, jside)
-      srg%ireq(jdir, jside, iblock_send) = comm_send_init( &
-        srg%cache(jdir, jsidr, iblock_send)%dbuf, &
-        neig(jdir, jside), 0, srg%icomm &
-      )
-      srg%ireq(jdir, jside, iblock_recv) = comm_recv_init( &
-        srg%cache(jdir, jsidr, iblock_recv)%dbuf, &
-        neig(jdir, jside), 0, srg%icomm &
-      )
+      implicit none
+      integer, intent(in) :: jdir, jside
+      ! Send (and initialize persistent communication)
+      srg%ireq(jdir, jside, itype_send) = comm_send_init( &
+        srg%cache(jdir, jsidr, itype_send)%dbuf, &
+        srg%neig(jdir, jside), &
+        tag(jdir, jside), &
+        srg%icomm)
+      ! Recv (and initialize persistent communication)
+      srg%ireq(jdir, jside, itype_recv) = comm_recv_init( &
+        srg%cache(jdir, jsidr, itype_recv)%dbuf, &
+        srg&neig(jdir, jside), &
+        tag(jdir, flip(jside)), & ! flip(jside) is jside in sender
+        srg%icomm)
     end subroutine init_pcomm
 
     subroutine pack_cache(jdir, jside)
       use pack_unpack, only: copy_data
       integer, intent(in) :: jdir, jside
       integer :: is_s(1:3), ie_s(1:3) ! src region
-      is_s(1:3) = srg%is_block(jdir, jside, iblock_send, 1:3)
-      ie_s(1:3) = srg%ie_block(jdir, jside, iblock_send, 1:3)
+      is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
+      ie_s(1:3) = srg%ie_block(jdir, jside, itype_send, 1:3)
       call copy_data( &
         data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%ns), &
-        srg%cache(jdir, jside, iblock_send)%dbuf &
-      )
+        srg%cache(jdir, jside, itype_send)%dbuf)
     end subroutine pack_cache
 
     subroutine unpack_cache(jdir, jside)
       use pack_unpack, only: copy_data
       integer, intent(in) :: jdir, jside
       integer :: is_d(1:3), ie_d(1:3) ! dst region
-      is_d(1:3) = srg%is_block(jdir, jside, iblock_recv, 1:3)
-      ie_d(1:3) = srg%ie_block(jdir, jside, iblock_recv, 1:3)
+      is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
+      ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
       call copy_data( &
-        srg%cache(jdir, jside, iblock_recv)%dbuf, &
-        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%ns) &
-      )
+        srg%cache(jdir, jside, itype_recv)%dbuf, &
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%ns))
     end subroutine unpack_cache
 
     subroutine copy_self(jdir, jside)
@@ -234,21 +243,21 @@ module sendrecv_grid
       type(array_shape) :: rsrc(1:4), rdst(1:4)
       integer :: is_s(1:3), ie_s(1:3) ! src region
       integer :: is_d(1:3), ie_d(1:3) ! dst region
-      is_s(1:3) = srg%is_block(jdir, jside, iblock_send, 1:3)
-      ie_s(1:3) = srg%ie_block(jdir, jside, iblock_send, 1:3)
-      is_d(1:3) = srg%is_block(jdir, jside, iblock_recv, 1:3)
-      ie_d(1:3) = srg%ie_block(jdir, jside, iblock_recv, 1:3)
+      is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
+      ie_s(1:3) = srg%ie_block(jdir, jside, itype_send, 1:3)
+      is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
+      ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
       call copy_data( &
         data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%ns), &
-        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%ns) &
-      )
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%ns))
     end subroutine copy_self
 
   end subroutine update_overlap_array4d_real8
 
 
 
+
+
 end module sendrecv_grid
 
-#undef FLIP12
 
