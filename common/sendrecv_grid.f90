@@ -165,7 +165,7 @@ module sendrecv_grid
     type(s_sendrecv_grid4d), intent(inout) :: srg
     real(8), intent(inout) :: data(:, :, :, :)
     integer :: idir, iside
-
+    
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iside = 1, 2 ! 1:up,2:down
         if (srg%neig(idir, iside) /= comm_proc_null) then
@@ -194,7 +194,7 @@ module sendrecv_grid
     end do
     srg%pcomm_initialized = .true.
 
-  contains
+    contains
 
     subroutine init_pcomm(jdir, jside)
       use salmon_communication, only: comm_send_init, comm_recv_init
@@ -243,8 +243,8 @@ module sendrecv_grid
       integer, intent(in) :: jdir, jside
       integer :: is_s(1:3), ie_s(1:3) ! src region
       integer :: is_d(1:3), ie_d(1:3) ! dst region
-      is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
-      ie_s(1:3) = srg%ie_block(jdir, jside, itype_send, 1:3)
+      is_s(1:3) = srg%is_block(jdir, flip(jside), itype_send, 1:3)
+      ie_s(1:3) = srg%ie_block(jdir, flip(jside), itype_send, 1:3)
       is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
       ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
       call copy_data( &
