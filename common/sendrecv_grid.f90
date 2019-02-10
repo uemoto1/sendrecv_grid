@@ -82,6 +82,7 @@ module sendrecv_grid
     integer, intent(in) :: icomm
     integer, intent(in) :: is(4), ie(4), nd
     integer, intent(in) :: neig(1:3, 1:2)
+    integer :: idir, iside, itype
     integer :: is_block(1:3, 1:2, 1:2, 1:3)
     integer :: ie_block(1:3, 1:2, 1:2, 1:3)
     
@@ -147,12 +148,10 @@ module sendrecv_grid
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iside = 1, 2 ! 1:up,2:down
         do itype = 1, 2 ! 1:send, 2:recv
-          do iaxis = 1, 3 ! 1:x,2:y,3:z
-            is_b(1:3) = is_block(idir, iside, itype, iaxis, 1:3)
-            ie_b(1:3) = ie_block(idir, iside, itype, iaxis, 1:3)
-            allocate(srg%cache%dbuf(idir, iside, itype, iaxis)( &
+            is_b(1:3) = srg%is_block(idir, iside, itype, 1:3)
+            ie_b(1:3) = srg%ie_block(idir, iside, itype, 1:3)
+            allocate(srg%cache(idir, iside, itype)%dbuf( &
               is_b(1):is_e(1), is_b(1):is_e(1), is_b(1):is_e(1), 1:nbk))
-          end do
         end do
       end do
     end do
