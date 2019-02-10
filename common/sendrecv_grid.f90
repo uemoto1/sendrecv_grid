@@ -39,7 +39,7 @@ module sendrecv_grid
     ! Lower(is) and upper(ie) bound of local grid (1:x,2:y,3:z)
     integer :: is(1:3), ie(1:3)
     ! Number of orbitals (4-th dimension of grid)
-    integer :: ns
+    integer :: nb
     ! Width of overlap region (4 is prefered)
     integer :: nd
     ! Communicator
@@ -76,18 +76,16 @@ module sendrecv_grid
     tag = 2 * idir + iside
   end function tag
 
-  subroutine init_sendrecv_grid4d(srg, icomm, is, ie, ns, nd, neig)
+  subroutine init_sendrecv_grid4d(srg, icomm, myrank, is, ie, nb, nd, neig)
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
-    integer, intent(in) :: icomm
-    integer, intent(in) :: is(4), ie(4), nd
+    integer, intent(in) :: icomm, myrank
+    integer, intent(in) :: is(4), ie(4), nb, nd
     integer, intent(in) :: neig(1:3, 1:2)
-    integer :: idir, iside, itype
+    integer :: idir, iaxis
     integer :: is_block(1:3, 1:2, 1:2, 1:3)
     integer :: ie_block(1:3, 1:2, 1:2, 1:3)
     
-    integer :: idummy
-
     ! Calculate shape (upper and lower bounds) of overlapped region:
     ! NOTE:
     !
@@ -130,20 +128,20 @@ module sendrecv_grid
     ! Assign to s_sendrecv_grid4d structure:
     srg%is(1:3) = is(1:3)
     srg%ie(1:3) = ie(1:3)
-    srg%ns = ns
+    srg%nb = nb
     srg%nd = nd
     srg%neig = neig
     srg%is_block(:, :, :, :) = is_block
     srg%ie_block(:, :, :, :) = ie_block
     srg%icomm = icomm
-    call comm_get_groupinfo(icomm, srg%myrank, idummy)
+    srg%myrank = myrank
   end subroutine init_sendrecv_grid4d
 
 
   subroutine alloc_cache_real8(srg)
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
-    integer :: is_b(3), ie_b(3)
+    integer :: idir, iside, itype, is_b(3), ie_b(3)
     ! Allocate cache region for persistent communication:
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iside = 1, 2 ! 1:up,2:down
@@ -151,7 +149,7 @@ module sendrecv_grid
             is_b(1:3) = srg%is_block(idir, iside, itype, 1:3)
             ie_b(1:3) = srg%ie_block(idir, iside, itype, 1:3)
             allocate(srg%cache(idir, iside, itype)%dbuf( &
-              is_b(1):is_e(1), is_b(1):is_e(1), is_b(1):is_e(1), 1:nbk))
+              is_b(1):ie_b(1), is_b(2):ie_b(2), is_b(3):ie_b(3),  1:srg%nb))
         end do
       end do
     end do
@@ -197,19 +195,20 @@ module sendrecv_grid
   contains
 
     subroutine init_pcomm(jdir, jside)
+      use salmon_communication, only: comm_send_init, comm_recv_init
       implicit none
       integer, intent(in) :: jdir, jside
       ! Send (and initialize persistent communication)
       srg%ireq(jdir, jside, itype_send) = comm_send_init( &
-        srg%cache(jdir, jsidr, itype_send)%dbuf, &
+        srg%cache(jdir, jside, itype_send)%dbuf, &
         srg%neig(jdir, jside), &
         tag(jdir, jside), &
         srg%icomm)
       ! Recv (and initialize persistent communication)
       srg%ireq(jdir, jside, itype_recv) = comm_recv_init( &
-        srg%cache(jdir, jsidr, itype_recv)%dbuf, &
-        srg&neig(jdir, jside), &
-        tag(jdir, flip(jside)), & ! flip(jside) is jside in sender
+        srg%cache(jdir, jside, itype_recv)%dbuf, &
+        srg%neig(jdir, jside), &
+        tag(jdir, flip(jside)), & ! `jside` in sender
         srg%icomm)
     end subroutine init_pcomm
 
@@ -221,7 +220,7 @@ module sendrecv_grid
       is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
       ie_s(1:3) = srg%ie_block(jdir, jside, itype_send, 1:3)
       call copy_data( &
-        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%ns), &
+        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
         srg%cache(jdir, jside, itype_send)%dbuf)
     end subroutine pack_cache
 
@@ -234,13 +233,12 @@ module sendrecv_grid
       ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
       call copy_data( &
         srg%cache(jdir, jside, itype_recv)%dbuf, &
-        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%ns))
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
     end subroutine unpack_cache
 
     subroutine copy_self(jdir, jside)
       use pack_unpack, only: copy_data
       integer, intent(in) :: jdir, jside
-      type(array_shape) :: rsrc(1:4), rdst(1:4)
       integer :: is_s(1:3), ie_s(1:3) ! src region
       integer :: is_d(1:3), ie_d(1:3) ! dst region
       is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
@@ -248,8 +246,8 @@ module sendrecv_grid
       is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
       ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
       call copy_data( &
-        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%ns), &
-        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%ns))
+        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
     end subroutine copy_self
 
   end subroutine update_overlap_array4d_real8
