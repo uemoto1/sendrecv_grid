@@ -98,11 +98,11 @@ module sendrecv_grid
     !    <------------->      
     !    Local grid size
     !
-    ! is_block|ie(idir, iside, iblock, iaxis): 
-    !   lower/upper bounds of each region
+    ! is/ie_block(idir, iside, itype, iaxis): 
+    !   lower/upper bounds of each blocks
     !   * idir: direction (1:x, 2:y, 3:z)
     !   * iside: kind of region (1:upside, 2:downside)
-    !   * iblock: kind of region (1:send, 2:recv)
+    !   * itype: kind of region (1:send, 2:recv)
     !   * iaxis: axis (1:x, 2:y, 3:z)
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iaxis = 1, 3 ! 1:x,2:y,3:z
@@ -146,18 +146,17 @@ module sendrecv_grid
     ! Allocate cache region for persistent communication:
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iside = 1, 2 ! 1:up,2:down
-        do iblock = 1, 2 ! 1:send, 2:recv
+        do itype = 1, 2 ! 1:send, 2:recv
           do iaxis = 1, 3 ! 1:x,2:y,3:z
-            is_b(1:3) = is_block(idir, iside, iblock, iaxis, 1:3)
-            ie_b(1:3) = ie_block(idir, iside, iblock, iaxis, 1:3)
-            allocate(srg%cache%dbuf(idir, iside, iblock, iaxis)( &
+            is_b(1:3) = is_block(idir, iside, itype, iaxis, 1:3)
+            ie_b(1:3) = ie_block(idir, iside, itype, iaxis, 1:3)
+            allocate(srg%cache%dbuf(idir, iside, itype, iaxis)( &
               is_b(1):is_e(1), is_b(1):is_e(1), is_b(1):is_e(1), 1:nbk))
           end do
         end do
       end do
     end do
-    ! Set pcomm_initialization flag
-    srg%pcomm_initialized = .false.
+    srg%pcomm_initialized = .false. ! Flag for persistent communication
   end subroutine
 
 
@@ -187,8 +186,8 @@ module sendrecv_grid
             call comm_wait_all(srg%ireq(idir, iside, :))
             call unpack_cache(idir, iside) ! Write back the recieved cache
           else
-            ! NOTE: If neightboring nodes are itself (periodic sys with single proc),
-            !       a simple side-to-side copy is used instead of the MPI.
+            ! NOTE: If neightboring nodes are itself (periodic with single proc),
+            !       a simple side-to-side copy is used instead of the MPI comm.
             call copy_self(idir, iside)
           end if
         end if
@@ -217,6 +216,7 @@ module sendrecv_grid
 
     subroutine pack_cache(jdir, jside)
       use pack_unpack, only: copy_data
+      implicit none
       integer, intent(in) :: jdir, jside
       integer :: is_s(1:3), ie_s(1:3) ! src region
       is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
@@ -228,6 +228,7 @@ module sendrecv_grid
 
     subroutine unpack_cache(jdir, jside)
       use pack_unpack, only: copy_data
+      implicit none
       integer, intent(in) :: jdir, jside
       integer :: is_d(1:3), ie_d(1:3) ! dst region
       is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
