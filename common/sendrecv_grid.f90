@@ -20,6 +20,8 @@ module sendrecv_grid
 
   implicit none
 
+  public :: init_sendrecv_grid4d
+  public :: alloc_cache_real8
   public :: update_overlap
   public :: s_sendrecv_grid4d
 
@@ -80,7 +82,7 @@ module sendrecv_grid
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
     integer, intent(in) :: icomm, myrank
-    integer, intent(in) :: is(4), ie(4), nb, nd
+    integer, intent(in) :: is(1:3), ie(1:3), nb, nd
     integer, intent(in) :: neig(1:3, 1:2)
     integer :: idir, iaxis
     integer :: is_block(1:3, 1:2, 1:2, 1:3)
@@ -107,14 +109,14 @@ module sendrecv_grid
       do iaxis = 1, 3 ! 1:x,2:y,3:z
         if (idir == iaxis) then
           ! upside-send (US) block:
-          is_block(idir, iside_up, itype_send, idir) = ie(idir) + 1
-          ie_block(idir, iside_up, itype_send, idir) = ie(idir) + nd
+          is_block(idir, iside_up, itype_send, idir) = ie(idir) - nd + 1
+          ie_block(idir, iside_up, itype_send, idir) = ie(idir) 
           ! upside-recv (UR) block:
-          is_block(idir, iside_up, itype_recv, idir) = ie(idir) - nd
-          ie_block(idir, iside_up, itype_recv, idir) = ie(idir)
+          is_block(idir, iside_up, itype_recv, idir) = ie(idir) + 1
+          ie_block(idir, iside_up, itype_recv, idir) = ie(idir) + nd
           ! downside-send (DS) block:
           is_block(idir, iside_down, itype_send, idir) = is(idir)
-          ie_block(idir, iside_down, itype_send, idir) = is(idir) + nd
+          ie_block(idir, iside_down, itype_send, idir) = is(idir) + nd - 1
           ! downside-recv (DR) block:
           is_block(idir, iside_down, itype_recv, idir) = is(idir) - nd
           ie_block(idir, iside_down, itype_recv, idir) = is(idir) - 1
