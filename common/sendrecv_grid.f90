@@ -25,6 +25,7 @@ module sendrecv_grid
   public :: update_overlap
   public :: s_sendrecv_grid4d
 
+
   integer, parameter :: iside_up   = 1
   integer, parameter :: iside_down = 2
   integer, parameter :: itype_send = 1
@@ -270,22 +271,24 @@ module sendrecv_grid
       ie_s(1:3) = srg%ie_block(jdir, flip(jside), itype_send, 1:3)
       is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
       ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
-      write(777, '("is|e_s:",6(i5))') is_s, ie_s
-      write(777, '("is|e_d:",6(i5))') is_d, ie_d
+      write(777, '("#is|e_s:",6(i5))') is_s, ie_s
+      write(777, '("#is|e_d:",6(i5))') is_d, ie_d
       flush(777)
-      data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb) =&
-      data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb)
-      write(777,'("data",4(i5,":",i5,","))') &
+      write(777,'("#data",4(i5,":",i5,","))') &
       lbound(data, 1), ubound(data, 1), &
       lbound(data, 2), ubound(data, 2), &
       lbound(data, 3), ubound(data, 3), &
       lbound(data, 4), ubound(data, 4) 
-      !call copy_data( &
-      !  data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
-      !  data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
+      call copy_data( &
+        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
     end subroutine copy_self
 
   end subroutine update_overlap_array4d_real8
+
+
+
+
 
 
 
