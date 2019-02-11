@@ -10,7 +10,7 @@ program main
     open(777, file=logfile)
 
     ! call test001()
-    call test002(2, 1, 1)
+    call test002(nproc_size_global, 1, 1)
     ! call test003()
     ! call test004()
 

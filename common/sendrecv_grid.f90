@@ -67,7 +67,7 @@ module sendrecv_grid
 
   contains
 
-  ! Flip 1 or 2 to 2 or 1:
+  ! Flip 1 to 2, 2 to 1:
   integer function flip(i)
     implicit none
     integer, intent(in) :: i
