@@ -84,8 +84,8 @@ module sendrecv_grid
 
   ! Initializing s_sendrecv_grid4d structure:
   ! NOTE:
-  ! * This subroutine can be commonly used for real type and complex type.
-  ! * The cache region MUST BE allocated after this initialization 
+  ! * This subroutine is commonly used for real type and complex type.
+  ! * The cache region MUST be allocated after this initialization 
   !   by using `alloc_cache_real8/complex8`.
   subroutine init_sendrecv_grid4d(srg, icomm, myrank, is, ie, nb, nd, neig)
     implicit none
@@ -148,6 +148,7 @@ module sendrecv_grid
     srg%ie_block(:, :, :, :) = ie_block
     srg%icomm = icomm
     srg%myrank = myrank
+    srg%ireq = -1
   end subroutine init_sendrecv_grid4d
 
 
@@ -271,28 +272,12 @@ module sendrecv_grid
       ie_s(1:3) = srg%ie_block(jdir, flip(jside), itype_send, 1:3)
       is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
       ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
-      write(777, '("#is|e_s:",6(i5))') is_s, ie_s
-      write(777, '("#is|e_d:",6(i5))') is_d, ie_d
-      flush(777)
-      write(777,'("#data",4(i5,":",i5,","))') &
-      lbound(data, 1), ubound(data, 1), &
-      lbound(data, 2), ubound(data, 2), &
-      lbound(data, 3), ubound(data, 3), &
-      lbound(data, 4), ubound(data, 4) 
       call copy_data( &
         data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
         data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
     end subroutine copy_self
 
   end subroutine update_overlap_array4d_real8
-
-
-
-
-
-
-
-
 
 end module sendrecv_grid
 

@@ -135,6 +135,14 @@ subroutine test002(mx, my, mz)
 
     call update_overlap(srg, temp)
 
+    do idir = 1, 3
+        do iside = 1, 2
+            do itype = 1, 2
+                write(777, '("#ireq:", 3(i5,1x), "=", i5)') idir, iside, itype, srg%ireq(idir, iside, itype)
+            end do
+        end do
+    end do
+
     do ix = is(1)-nd, ie(1)+nd
         do iy = is(2)-nd, ie(2)+nd
             do iz = is(3)-nd, ie(3)+nd
@@ -148,7 +156,6 @@ subroutine test002(mx, my, mz)
     write(777, "(a)") "#SAFE POINT"
     flush(777)
     return
-
 
 end subroutine test002
 
