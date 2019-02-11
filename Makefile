@@ -10,6 +10,7 @@ common/structures.o \
 common/pack_unpack.o \
 common/sendrecv_grid.o \
 test001.o \
+test002.o \
 main.o
 
 

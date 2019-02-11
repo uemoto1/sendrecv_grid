@@ -9,8 +9,8 @@ program main
     write(*, '(i6, x, i6, x, a)') nproc_size_global, nproc_id_global, logfile
     open(777, file=logfile)
 
-    call test001()
-    ! call test002()
+    ! call test001()
+    call test002(2, 1, 1)
     ! call test003()
     ! call test004()
 
