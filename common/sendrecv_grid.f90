@@ -39,7 +39,7 @@ module sendrecv_grid
   ! TODO: Move type defination to "common/structures.f90"
   type s_sendrecv_grid4d
     ! Lower(is) and upper(ie) bound of local grid (1:x,2:y,3:z)
-    integer :: is(1:3), ie(1:3)
+    integer :: is(1:3), ie(1:3), is_overlap(1:3), ie_overlap(1:3)
     ! Number of orbitals (4-th dimension of grid)
     integer :: nb
     ! Width of overlap region (4 is prefered)
@@ -66,18 +66,26 @@ module sendrecv_grid
 
   contains
 
+  ! Flip 1 or 2 to 2 or 1:
   integer function flip(i)
     implicit none
     integer, intent(in) :: i
     flip = 3 - i
   end function flip
 
+  ! Prepare unique MPI tag number (3~8) for send/recv based on
+  ! the communication direction (idir, iside) from the sender:
   integer function tag(idir, iside)
     implicit none
     integer, intent(in) :: idir, iside
     tag = 2 * idir + iside
   end function tag
 
+  ! Initializing s_sendrecv_grid4d structure:
+  ! NOTE:
+  ! * This subroutine can be commonly used for real type and complex type.
+  ! * The cache region MUST BE allocated after this initialization 
+  !   by using `alloc_cache_real8/complex8`.
   subroutine init_sendrecv_grid4d(srg, icomm, myrank, is, ie, nb, nd, neig)
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
@@ -130,6 +138,8 @@ module sendrecv_grid
     ! Assign to s_sendrecv_grid4d structure:
     srg%is(1:3) = is(1:3)
     srg%ie(1:3) = ie(1:3)
+    srg%is_overlap(1:3) = is(1:3) - nd
+    srg%ie_overlap(1:3) = ie(1:3) + nd
     srg%nb = nb
     srg%nd = nd
     srg%neig = neig
@@ -140,11 +150,12 @@ module sendrecv_grid
   end subroutine init_sendrecv_grid4d
 
 
+  ! Allocate cache region for persistent communication:
   subroutine alloc_cache_real8(srg)
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
     integer :: idir, iside, itype, is_b(3), ie_b(3)
-    ! Allocate cache region for persistent communication:
+
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iside = 1, 2 ! 1:up,2:down
         do itype = 1, 2 ! 1:send, 2:recv
@@ -163,27 +174,25 @@ module sendrecv_grid
     use salmon_communication, only: comm_start_all, comm_wait_all, comm_proc_null
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
-    real(8), intent(inout) :: data(:, :, :, :)
+    real(8), intent(inout) :: data( &
+      srg%is_overlap(1):srg%ie_overlap(1), &
+      srg%is_overlap(2):srg%ie_overlap(2), &
+      srg%is_overlap(3):srg%ie_overlap(3), &
+      1:srg%nb)
     integer :: idir, iside
+
+    ! Exchange the overlap region with the neighboring node (or opposite side of itself).
     
     do idir = 1, 3 ! 1:x,2:y,3:z
       do iside = 1, 2 ! 1:up,2:down
         if (srg%neig(idir, iside) /= comm_proc_null) then
           if (srg%neig(idir, iside) /= srg%myrank) then
-            call pack_cache(idir, iside) ! Store the overlap reigion into cache 
+            ! Store the overlap reigion into the cache 
+            call pack_cache(idir, iside) 
+            ! In the first call of this subroutine, setup the persistent communication:
             if (.not. srg%pcomm_initialized) call init_pcomm(idir, iside)
+            ! Start to communication
             call comm_start_all(srg%ireq(idir, iside, :))
-          end if
-        end if
-      end do
-    end do
-
-    do idir = 1, 3 ! 1:x,2:y,3:z
-      do iside = 1, 2 ! 1:upside,2:downside
-        if (srg%neig(idir, iside) /= comm_proc_null) then
-          if (srg%neig(idir, iside) /= srg%myrank) then
-            call comm_wait_all(srg%ireq(idir, iside, :))
-            call unpack_cache(idir, iside) ! Write back the recieved cache
           else
             ! NOTE: If neightboring nodes are itself (periodic with single proc),
             !       a simple side-to-side copy is used instead of the MPI comm.
@@ -192,7 +201,21 @@ module sendrecv_grid
         end if
       end do
     end do
-    srg%pcomm_initialized = .true.
+
+    do idir = 1, 3 ! 1:x,2:y,3:z
+      do iside = 1, 2 ! 1:up,2:down
+        if (srg%neig(idir, iside) /= comm_proc_null) then
+          if (srg%neig(idir, iside) /= srg%myrank) then
+            ! Wait for recieving
+            call comm_wait_all(srg%ireq(idir, iside, :))
+            ! Write back the recieved cache
+            call unpack_cache(idir, iside)
+          end if
+        end if
+      end do
+    end do
+
+    srg%pcomm_initialized = .true. ! Update pcomm_initialized
 
     contains
 
@@ -247,9 +270,19 @@ module sendrecv_grid
       ie_s(1:3) = srg%ie_block(jdir, flip(jside), itype_send, 1:3)
       is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
       ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
-      call copy_data( &
-        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
-        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
+      write(777, '("is|e_s:",6(i5))') is_s, ie_s
+      write(777, '("is|e_d:",6(i5))') is_d, ie_d
+      flush(777)
+      data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb) =&
+      data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb)
+      write(777,'("data",4(i5,":",i5,","))') &
+      lbound(data, 1), ubound(data, 1), &
+      lbound(data, 2), ubound(data, 2), &
+      lbound(data, 3), ubound(data, 3), &
+      lbound(data, 4), ubound(data, 4) 
+      !call copy_data( &
+      !  data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
+      !  data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
     end subroutine copy_self
 
   end subroutine update_overlap_array4d_real8
