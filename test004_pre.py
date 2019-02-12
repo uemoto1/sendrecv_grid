@@ -13,7 +13,7 @@ for m in [2, 3, 4, 5, 6, 7, 8]:
     nproc = m ** 3
     for n in [32, 48, 64]:
         name = "%02d_%02d" % (m, n)
-        with open("test004/%s.sh" % name) as fh:
+        with open("test004/%s.sh" % name, "w") as fh:
             fh.write(job_template.format(
                 NAME=name,
                 NPROC=nproc,
