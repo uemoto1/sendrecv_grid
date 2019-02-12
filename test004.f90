@@ -36,6 +36,7 @@ subroutine test004()
     call comm_bcast(ny ,nproc_group_global)
     call comm_bcast(nz ,nproc_group_global)
     call comm_bcast(nb ,nproc_group_global)
+    write(777, '("#args:", 7(i5,1x))')  mx, my, mz, nx, ny, nz, nb
 
     if (nproc_size_global /= mx * my * mz) then
         stop "Number of Procs Mismatch!"
