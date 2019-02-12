@@ -31,7 +31,7 @@ subroutine test002(mx, my, mz)
     myrank = nproc_id_global
     map_id = comm_proc_null
 
-    if (mx*my*mz <= myrank) then
+    if (nproc_size_global /= mx*my*mz) then
         stop "MPI size mismatch"
     end if
 
