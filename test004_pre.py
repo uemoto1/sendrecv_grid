@@ -21,5 +21,5 @@ for m in [2, 3, 4, 5, 6, 7, 8]:
                 NX=n, NY=n, NZ=n,
                 NB=8,
             ))
-        result.append("pjsub %s.sh")
+        result.append("pjsub %s.sh" % name)
 print("\n".join(result))
