@@ -2,7 +2,7 @@
 import numpy as np
 
 result = []
-for m in [2, 3, 4, 5, 6, 7]:
+for m in [2, 3, 4, 5, 6, 7, 8]:
     row = [m]
     for n in [32, 48, 64]:
         name = "%02d_%02d" % (m, n)
