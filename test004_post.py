@@ -12,10 +12,8 @@ for m in [2, 3, 4, 5, 6, 7, 8]:
                 for line in fh:
                     if "cputime" in line:
                         tmp.append( float(line.split(":")[-1]) )
-        row += [
-            np.amin(tmp), np.average(tmp), np.max(tmp)
-        ]
-    result.append(row)
+        row += [np.average(tmp)]
+    result += [row]
 
 np.savetxt("test004_result.txt", result)
 
