@@ -3,7 +3,7 @@ import numpy as np
 
 result = []
 for n in [16, 32, 48, 64, 96]:
-    row = [m]
+    row = [n]
     for m in [3, 4, 5]:
         name = "%02d_%02d" % (m, n)
         for i in range(m*m*m):
