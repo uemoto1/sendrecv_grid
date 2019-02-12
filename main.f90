@@ -10,9 +10,9 @@ program main
     open(777, file=logfile)
 
     ! call test001()
-    call test002(4, 1, 1)
+    ! call test002(4, 1, 1)
     ! call test003(2, 2, 4)
-    ! call test004()
+    call test004()
 
     close(777)
     call end_parallel()
