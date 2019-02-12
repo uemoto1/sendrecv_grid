@@ -4,7 +4,7 @@ import os
 with open("job.txt") as fh:
     job_template = fh.read()
 
-if not os.exist("test004"):
+if not os.path.exists("test004"):
     os.mkdir("test004")
 
 result = ["cd test004"]
