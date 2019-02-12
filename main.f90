@@ -11,9 +11,7 @@ program main
 
     ! call test001()
     ! call test002(nproc_size_global, 1, 1)
-    if (nproc_size_global == 16) then
-        call test003(2, 2, 4)
-    end if
+    call test003(2, 2, 4)
     ! call test004()
 
     close(777)

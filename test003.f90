@@ -28,6 +28,10 @@ subroutine test003(mx, my, mz)
     integer :: idir, iside, itype
     real(8), allocatable :: temp(:, :, :, :)
 
+    if (nproc_size_global /= mx * my * mz) then
+        stop "Number of Procs Mismatch!"
+    endif
+
     myrank = nproc_id_global
     map_id = comm_proc_null
 
