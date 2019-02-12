@@ -8,7 +8,7 @@ subroutine test004()
     implicit none
     integer :: mx, my, mz, nx, ny, nz, nb
 
-    integer, parameter :: nd = 4, nt = 1
+    integer, parameter :: nd = 4, nt = 1000
     
     integer :: myrank
     integer :: ix, iy, iz, ib, it
