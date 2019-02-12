@@ -4,6 +4,7 @@ subroutine test004()
     use sendrecv_grid
     use salmon_parallel
     use salmon_communication
+    use omp_lib
     implicit none
     integer :: mx, my, mz, nx, ny, nz, nb
 
@@ -140,11 +141,11 @@ subroutine test004()
         end do
     end do
 
-    call cpu_time(t1)
+    t1 = omp_get_wtime()
     do it = 1, nt
     call update_overlap(srg, temp)
     end do
-    call cpu_time(t2)
+    t2 = omp_get_wtime()
 
     write(777, '("cputime:", es24.15e4)') t2 - t1
 
