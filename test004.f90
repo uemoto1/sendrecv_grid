@@ -26,7 +26,7 @@ subroutine test004()
 
     real(8) :: t1, t2
 
-    if (comm_is_root(nproc_group_global)) then 
+    if (comm_is_root(nproc_id_global)) then 
         read(*, *) mx, my, mz, nx, ny, nz, nb
     end if
     call comm_bcast(mx ,nproc_group_global)
