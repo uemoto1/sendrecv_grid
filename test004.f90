@@ -136,7 +136,7 @@ subroutine test004()
     end do
     call cpu_time(t2)
 
-    write(777, '("cputime:", es23.15e4)') t2 - t1
+    write(777, '("cputime:", es24.15e4)') t2 - t1
 
     return
 
