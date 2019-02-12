@@ -9,9 +9,9 @@ if not os.path.exists("test004"):
 
 result = ["cd test004"]
 
-for m in [2, 3, 4, 5, 6, 7, 8]:
+for m in [3, 4, 5]:
     nproc = m ** 3
-    for n in [32, 48, 64]:
+    for n in [16, 96 ]:
         name = "%02d_%02d" % (m, n)
         with open("test004/%s.sh" % name, "w") as fh:
             fh.write(job_template.format(
