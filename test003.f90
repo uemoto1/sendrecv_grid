@@ -41,9 +41,9 @@ subroutine test003(mx, my, mz)
             end do
         end do
     end do
-    ! periodic for x axis
-    map_id(0, :, :) = map_id(mx, :, :)
-    map_id(mx+1, :, :) = map_id(1, :, :)
+    ! periodic for z-axis
+    map_id(:, :, 0) = map_id:, :, mz)
+    map_id(:, :, mz+1) = map_id(:, :, 1)
 
     do idir = 1, 3
         do iside = 1, 2
