@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-import numpy as np
-import sys
 import os
 
 with open("job.txt") as fh:
     job_template = fh.read()
 
-if not os.exists("test004"):
+if not os.exist("test004"):
     os.mkdir("test004")
 
 result = ["cd test004"]
