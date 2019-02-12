@@ -19,6 +19,7 @@ for m in [2, 3, 4, 5, 6, 7, 8]:
                 NPROC=nproc,
                 MX=m, MY=m, MZ=m,
                 NX=n, NY=n, NZ=n,
+                NB=8,
             ))
         result.append("pjsub %s.sh")
 print("\n".join(result))
