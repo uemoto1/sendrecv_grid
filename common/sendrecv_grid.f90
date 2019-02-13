@@ -34,7 +34,7 @@ module sendrecv_grid
   ! TODO: Move type defination to "common/structures.f90"
   type s_pcomm_cache4d
     real(8), allocatable :: dbuf(:, :, :, :)
-    real(8), allocatable :: zbuf(:, :, :, :)
+    complex(8), allocatable :: zbuf(:, :, :, :)
   end type s_pcomm_cache4d
 
   ! TODO: Move type defination to "common/structures.f90"
@@ -59,7 +59,7 @@ module sendrecv_grid
 
   interface update_overlap
   module procedure update_overlap_array4d_real8
-  !module procedure update_overlap_array4d_complex8
+  module procedure update_overlap_array4d_complex8
   end interface
 
 
@@ -158,6 +158,26 @@ module sendrecv_grid
             is_b(1:3) = srg%is_block(idir, iside, itype, 1:3)
             ie_b(1:3) = srg%ie_block(idir, iside, itype, 1:3)
             allocate(srg%cache(idir, iside, itype)%dbuf( &
+              is_b(1):ie_b(1), is_b(2):ie_b(2), is_b(3):ie_b(3), 1:srg%nb))
+        end do
+      end do
+    end do
+    srg%pcomm_initialized = .false. ! Flag for persistent communication
+  end subroutine
+
+
+  ! Allocate cache region for persistent communication:
+  subroutine alloc_cache_complex8(srg)
+    implicit none
+    type(s_sendrecv_grid4d), intent(inout) :: srg
+    integer :: idir, iside, itype, is_b(3), ie_b(3)
+
+    do idir = 1, 3 ! 1:x,2:y,3:z
+      do iside = 1, 2 ! 1:up,2:down
+        do itype = 1, 2 ! 1:send, 2:recv
+            is_b(1:3) = srg%is_block(idir, iside, itype, 1:3)
+            ie_b(1:3) = srg%ie_block(idir, iside, itype, 1:3)
+            allocate(srg%cache(idir, iside, itype)%zbuf( &
               is_b(1):ie_b(1), is_b(2):ie_b(2), is_b(3):ie_b(3), 1:srg%nb))
         end do
       end do
@@ -272,6 +292,115 @@ module sendrecv_grid
     end subroutine copy_self
 
   end subroutine update_overlap_array4d_real8
+
+
+  subroutine update_overlap_array4d_complex8(srg, data)
+    use salmon_communication, only: comm_start_all, comm_wait_all, comm_proc_null
+    implicit none
+    type(s_sendrecv_grid4d), intent(inout) :: srg
+    complex(8), intent(inout) :: data( &
+      srg%rg%is_array(1):srg%rg%ie_array(1), &
+      srg%rg%is_array(2):srg%rg%ie_array(2), &
+      srg%rg%is_array(3):srg%rg%ie_array(3), &
+      1:srg%nb)
+    integer :: idir, iside
+
+    ! Exchange the overlap region with the neighboring node (or opposite side of itself).
+    
+    do idir = 1, 3 ! 1:x,2:y,3:z
+      do iside = 1, 2 ! 1:up,2:down
+        if (srg%neig(idir, iside) /= comm_proc_null) then
+          if (srg%neig(idir, iside) /= srg%myrank) then
+            ! Store the overlap reigion into the cache 
+            call pack_cache(idir, iside) 
+            ! In the first call of this subroutine, setup the persistent communication:
+            if (.not. srg%pcomm_initialized) call init_pcomm(idir, iside)
+            ! Start to communication
+            call comm_start_all(srg%ireq(idir, iside, :))
+          else
+            ! NOTE: If neightboring nodes are itself (periodic with single proc),
+            !       a simple side-to-side copy is used instead of the MPI comm.
+            call copy_self(idir, iside)
+          end if
+        end if
+      end do
+    end do
+
+    do idir = 1, 3 ! 1:x,2:y,3:z
+      do iside = 1, 2 ! 1:up,2:down
+        if (srg%neig(idir, iside) /= comm_proc_null) then
+          if (srg%neig(idir, iside) /= srg%myrank) then
+            ! Wait for recieving
+            call comm_wait_all(srg%ireq(idir, iside, :))
+            ! Write back the recieved cache
+            call unpack_cache(idir, iside)
+          end if
+        end if
+      end do
+    end do
+
+    srg%pcomm_initialized = .true. ! Update pcomm_initialized
+
+    contains
+
+    subroutine init_pcomm(jdir, jside)
+      use salmon_communication, only: comm_send_init, comm_recv_init
+      implicit none
+      integer, intent(in) :: jdir, jside
+      ! Send (and initialize persistent communication)
+      srg%ireq(jdir, jside, itype_send) = comm_send_init( &
+        srg%cache(jdir, jside, itype_send)%zbuf, &
+        srg%neig(jdir, jside), &
+        tag(jdir, jside), &
+        srg%icomm)
+      ! Recv (and initialize persistent communication)
+      srg%ireq(jdir, jside, itype_recv) = comm_recv_init( &
+        srg%cache(jdir, jside, itype_recv)%zbuf, &
+        srg%neig(jdir, jside), &
+        tag(jdir, flip(jside)), & ! `jside` in sender
+        srg%icomm)
+    end subroutine init_pcomm
+
+    subroutine pack_cache(jdir, jside)
+      use pack_unpack, only: copy_data
+      implicit none
+      integer, intent(in) :: jdir, jside
+      integer :: is_s(1:3), ie_s(1:3) ! src region
+      is_s(1:3) = srg%is_block(jdir, jside, itype_send, 1:3)
+      ie_s(1:3) = srg%ie_block(jdir, jside, itype_send, 1:3)
+      call copy_data( &
+        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
+        srg%cache(jdir, jside, itype_send)%zbuf)
+    end subroutine pack_cache
+
+    subroutine unpack_cache(jdir, jside)
+      use pack_unpack, only: copy_data
+      implicit none
+      integer, intent(in) :: jdir, jside
+      integer :: is_d(1:3), ie_d(1:3) ! dst region
+      is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
+      ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
+      call copy_data( &
+        srg%cache(jdir, jside, itype_recv)%zbuf, &
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
+    end subroutine unpack_cache
+
+    subroutine copy_self(jdir, jside)
+      use pack_unpack, only: copy_data
+      integer, intent(in) :: jdir, jside
+      integer :: is_s(1:3), ie_s(1:3) ! src region
+      integer :: is_d(1:3), ie_d(1:3) ! dst region
+      is_s(1:3) = srg%is_block(jdir, flip(jside), itype_send, 1:3)
+      ie_s(1:3) = srg%ie_block(jdir, flip(jside), itype_send, 1:3)
+      is_d(1:3) = srg%is_block(jdir, jside, itype_recv, 1:3)
+      ie_d(1:3) = srg%ie_block(jdir, jside, itype_recv, 1:3)
+      call copy_data( &
+        data(is_s(1):ie_s(1), is_s(2):ie_s(2), is_s(3):ie_s(3), 1:srg%nb), &
+        data(is_d(1):ie_d(1), is_d(2):ie_d(2), is_d(3):ie_d(3), 1:srg%nb))
+    end subroutine copy_self
+
+  end subroutine update_overlap_array4d_complex8
+
 
 end module sendrecv_grid
 
