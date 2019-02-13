@@ -16,7 +16,7 @@
 
 
 module sendrecv_grid
-  use pack_unpack, only: array_shape
+  use structures, only: s_rgrid
 
   implicit none
 
@@ -39,12 +39,10 @@ module sendrecv_grid
 
   ! TODO: Move type defination to "common/structures.f90"
   type s_sendrecv_grid4d
-    ! Lower(is) and upper(ie) bound of local grid (1:x,2:y,3:z)
-    integer :: is(1:3), ie(1:3), is_overlap(1:3), ie_overlap(1:3)
+    ! Size of grid system
+    type(s_rgrid) :: rg
     ! Number of orbitals (4-th dimension of grid)
     integer :: nb
-    ! Width of overlap region (4 is prefered)
-    integer :: nd
     ! Communicator
     integer :: icomm, myrank
     ! Neightboring MPI id (1:x,2:y,3:z, 1:upside,2:downside):
@@ -87,12 +85,12 @@ module sendrecv_grid
   ! * This subroutine is commonly used for real type and complex type.
   ! * The cache region MUST be allocated after this initialization 
   !   by using `alloc_cache_real8/complex8`.
-  subroutine init_sendrecv_grid4d(srg, icomm, myrank, is, ie, nb, nd, neig)
+  subroutine init_sendrecv_grid4d(srg, rg, nb, icomm, myrank, neig)
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
-    integer, intent(in) :: icomm, myrank
-    integer, intent(in) :: is(1:3), ie(1:3), nb, nd
-    integer, intent(in) :: neig(1:3, 1:2)
+    type(s_rgrid), intent(in) :: rg
+    integer, intent(in) ::  nb, icomm, myrank, neig(1:3, 1:2)
+
     integer :: idir, iaxis
     integer :: is_block(1:3, 1:2, 1:2, 1:3)
     integer :: ie_block(1:3, 1:2, 1:2, 1:3)
@@ -118,31 +116,27 @@ module sendrecv_grid
       do iaxis = 1, 3 ! 1:x,2:y,3:z
         if (idir == iaxis) then
           ! upside-send (US) block:
-          is_block(idir, iside_up, itype_send, idir) = ie(idir) - nd + 1
-          ie_block(idir, iside_up, itype_send, idir) = ie(idir) 
+          is_block(idir, iside_up, itype_send, idir) = rg%ie(idir) - rg%nd + 1
+          ie_block(idir, iside_up, itype_send, idir) = rg%ie(idir) 
           ! upside-recv (UR) block:
-          is_block(idir, iside_up, itype_recv, idir) = ie(idir) + 1
-          ie_block(idir, iside_up, itype_recv, idir) = ie(idir) + nd
+          is_block(idir, iside_up, itype_recv, idir) = rg%ie(idir) + 1
+          ie_block(idir, iside_up, itype_recv, idir) = rg%ie(idir) + rg%nd
           ! downside-send (DS) block:
-          is_block(idir, iside_down, itype_send, idir) = is(idir)
-          ie_block(idir, iside_down, itype_send, idir) = is(idir) + nd - 1
+          is_block(idir, iside_down, itype_send, idir) = rg%is(idir)
+          ie_block(idir, iside_down, itype_send, idir) = rg%is(idir) + rg%nd - 1
           ! downside-recv (DR) block:
-          is_block(idir, iside_down, itype_recv, idir) = is(idir) - nd
-          ie_block(idir, iside_down, itype_recv, idir) = is(idir) - 1
+          is_block(idir, iside_down, itype_recv, idir) = rg%is(idir) - rg%nd
+          ie_block(idir, iside_down, itype_recv, idir) = rg%is(idir) - 1
         else
-          is_block(idir, :, :, iaxis) = is(iaxis)
-          ie_block(idir, :, :, iaxis) = ie(iaxis)
+          is_block(idir, :, :, iaxis) = rg%is(iaxis)
+          ie_block(idir, :, :, iaxis) = rg%ie(iaxis)
         end if
       end do
     end do
 
     ! Assign to s_sendrecv_grid4d structure:
-    srg%is(1:3) = is(1:3)
-    srg%ie(1:3) = ie(1:3)
-    srg%is_overlap(1:3) = is(1:3) - nd
-    srg%ie_overlap(1:3) = ie(1:3) + nd
+    srg%rg = rg
     srg%nb = nb
-    srg%nd = nd
     srg%neig = neig
     srg%is_block(:, :, :, :) = is_block
     srg%ie_block(:, :, :, :) = ie_block
@@ -164,7 +158,7 @@ module sendrecv_grid
             is_b(1:3) = srg%is_block(idir, iside, itype, 1:3)
             ie_b(1:3) = srg%ie_block(idir, iside, itype, 1:3)
             allocate(srg%cache(idir, iside, itype)%dbuf( &
-              is_b(1):ie_b(1), is_b(2):ie_b(2), is_b(3):ie_b(3),  1:srg%nb))
+              is_b(1):ie_b(1), is_b(2):ie_b(2), is_b(3):ie_b(3), 1:srg%nb))
         end do
       end do
     end do
@@ -177,9 +171,9 @@ module sendrecv_grid
     implicit none
     type(s_sendrecv_grid4d), intent(inout) :: srg
     real(8), intent(inout) :: data( &
-      srg%is_overlap(1):srg%ie_overlap(1), &
-      srg%is_overlap(2):srg%ie_overlap(2), &
-      srg%is_overlap(3):srg%ie_overlap(3), &
+      srg%rg%is_array(1):srg%rg%ie_array(1), &
+      srg%rg%is_array(2):srg%rg%ie_array(2), &
+      srg%rg%is_array(3):srg%rg%ie_array(3), &
       1:srg%nb)
     integer :: idir, iside
 
