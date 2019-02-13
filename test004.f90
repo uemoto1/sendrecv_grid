@@ -48,7 +48,6 @@ subroutine test004()
     icomm = nproc_group_global
     myrank = nproc_id_global
 
-    
     ! テスト用ノード配置マップを作成
     allocate(map_id(0:mx+1,0:my+1,0:mz+1))
     allocate(id_map(0:mx*my*mz-1, 1:3))
@@ -75,7 +74,7 @@ subroutine test004()
         end do
     end do
 
-    ! 実空間グリッド情報
+    ! テスト用実空間グリッド情報
     rg%nd = nd
     rg%is(1:3) = (/nx, ny, nz/) * id_map(myrank, :) + 1
     rg%ie(1:3) = (/nx, ny, nz/) * (id_map(myrank, :) + 1)
@@ -84,18 +83,16 @@ subroutine test004()
     rg%is_array = rg%is_overlap
     rg%ie_array = rg%ie_overlap
 
-    ! 実空間グリッドをアロケート
     allocate(data4d( &
         rg%is_array(1):rg%ie_array(1), &
         rg%is_array(2):rg%ie_array(2), &
         rg%is_array(3):rg%ie_array(3), &
         1:nb))
 
-
     ! 初期化
     call init_sendrecv_grid4d(srg, rg, nb, icomm, myrank, neig)
     
-    ! Check initialization
+    ! 初期化状態のチェック
     write(777, '("#is:", 3(i5,1x))') srg%rg%is
     write(777, '("#ie:", 3(i5,1x))') srg%rg%ie
     write(777, '("#is_overlap:", 3(i5,1x))') srg%rg%is_overlap
@@ -122,7 +119,7 @@ subroutine test004()
 
     call alloc_cache_real8(srg)
 
-    ! Check allocated region
+    ! 領域確保のチェック
     do idir = 1, 3
         do iside = 1, 2
             do itype = 1, 2
@@ -164,6 +161,7 @@ subroutine test004()
 
     write(777, '("#cputime:", es24.15e4)') t2 - t1
 
+    ! 通信結果の出力
     do ix = rg%is_overlap(1), rg%ie_overlap(1)
         do iy = rg%is_overlap(2), rg%ie_overlap(2)
             do iz = rg%is_overlap(3), rg%ie_overlap(3)
