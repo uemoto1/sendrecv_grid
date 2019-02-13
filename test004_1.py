@@ -2,8 +2,8 @@
 import numpy as np
 import sys
 
-# mx, my, mz, nx, ny, nz, nb, nd = map(int, sys.argv[1:])
-mx, my, mz, nx, ny, nz, nb, nd = 1, 1, 2, 12, 14, 16, 2, 4
+nd = 4
+mx, my, mz, nx, ny, nz, nb = map(int, sys.argv[2:])
 
 ox, oy, oz = nx + 2 * nd, ny + 2 * nd, nz + 2 * nd
 
@@ -16,7 +16,7 @@ for i, (ix, iy, iz) in enumerate(np.ndindex(mx, my, mz)):
 
 print("# Writing.. ")
 np.savez_compressed(
-    "test004_post_view.npz", 
+    sys.argv[1], 
     result=buf,
     x=np.arange(1-nd, nx+nd+1),
     y=np.arange(1-nd, ny+nd+1),
