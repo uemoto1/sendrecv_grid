@@ -1,8 +1,8 @@
 ## TODO
 
-- 袖通信は４次元配列(`double`/`dcomplex`)を対象にするように実装可能にする予定
-- 袖の長さ(`ND`)を調整可能にする予定
-- 袖通信関数のdouble/dcomplex切り替えに`interface`を使う
+- 対処済み：袖通信は４次元配列(`double`/`dcomplex`)を対象にするように実装可能にする予定
+- 対処済み：袖の長さ(`ND`)を調整可能にする予定
+- 対処済み：袖通信関数のdouble/dcomplex切り替えに`interface`を使う
 
 ## ファイル構造
 ```
@@ -31,16 +31,28 @@
 グリッド間通信の情報・永続通信用の一時変数を保持
 
 ```
-integer :: icomm !! MPI group
-logical :: use_complex !! .true.:complex(8), .false.:real(8)
-logical :: use_corner !! .false.:orthogonal, .true.:non-orthogonal
-integer :: neig(1:3, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward
-integer :: ireq(1:3, 1:2, 1:2) !! 1:x,2:y,3:z, 1:upward,2:downward, 1:send,2:recv
-type(s_wavefunction) :: srmatbox7d(1:3, 1:2, 1:2)
-type(array_shape) :: nshape(1:3, 1:2, 1:7)
+ type s_sendrecv_grid4d
+    ! Size of grid system
+    type(s_rgrid) :: rg
+    ! Number of orbitals (4-th dimension of grid)
+    integer :: nb
+    ! Communicator
+    integer :: icomm, myrank
+    ! Neightboring MPI id (1:x,2:y,3:z, 1:upside,2:downside):
+    integer :: neig(1:3, 1:2) 
+    ! Communication requests (1:x,2:y,3:z, 1:upside,2:downside, 1:send,2:recv):
+    integer :: ireq(1:3, 1:2, 1:2)
+    ! PComm cache (1:x,2:y,3:z, 1:upside,2:downside, 1:src/2:dst)
+    type(s_pcomm_cache4d) :: cache(1:3, 1:2, 1:2)
+    ! Range (dim=1:x,2:y,3:z, dir=1:upside,2:downside, 1:src/2:dst, axis=1...3)
+    integer :: is_block(1:3, 1:2, 1:2, 1:3)
+    integer :: ie_block(1:3, 1:2, 1:2, 1:3)
+    logical :: pcomm_initialized
+  end type s_sendrecv_grid4d
 ```
-
-- `use_complex`: 変数の複素数・実数判定
+- `rg`: 実空間グリッドの情報を格納(`s_rgrid`型)
+- `nb`: ４次元方向の要素数（軌道 * スピン）
+- `icomm, myrank`: MPIコミュニケータで初期化時に代入される
 - `neig(idim, idir)`: 隣接ノードのIDを格納
     - idim: 方向{1:x, 2:y, 3:z}
     - idir: 向き{1:upward, 2:downward} 
@@ -48,20 +60,42 @@ type(array_shape) :: nshape(1:3, 1:2, 1:7)
     - idim: 方向{1:x, 2:y, 3:z}
     - idir: 向き{1:upward, 2:downward} 
     - imode: 通信{1:send, 2:recv}
-- `srmatbox7d(idim, idir, iside)`: 永続通信用の一時記憶領域
-    - idim: 方向{1:x, 2:y, 3:z}
-    - idir: 向き{1:upward, 2:downward}
-    - iside: 送信元・送信先{1:src, 2:dst}
-- `nshape(1:3, 1:2, 1:7)`: 一時記憶領域の形
+- `is_block, ie_block(1:3, 1:2, 1:2, 1:3)`: 一時記憶領域の形
     - idim: 方向{1:x, 2:y, 3:z}
     - idir: 向き{1:upward, 2:downward}
     - iaxis: 軸・次元(1...7)
+- `pcomm_initialized`: 永続通信が初期化済みであることを確認するためのフラグ
 
-### sendrecv7d(srg, wf)
-- 通信用サブルーチン
+### init_sendrecv_grid4d(srg, rg, nb, icomm, myrank, neig)
+- 初期化用サブルーチン（複素・実数共通）
 
-### pack_smatbox7d(srg, wf, jdim, jdir)
-- 永続通信用の記憶領域へ送信データを書き込み
+### alloc_cache_real8(srg), alloc_cache_complex8(srg)
+- キャッシュ領域のアロケーション用関数（複素・実数別）
 
-### unpack_smatbox7d(srg, wf, jdim, jdir)
-- 永続通信用の記憶領域から受信データを取り出し
+### update_overlap(srg, data)
+- 袖通信用関数（複素・実数共通）、`data`の型により切り替わる
+
+## 使用手順（実数の場合）
+```
+type(s_sendrecv_grid4d) :: srg
+real(8), allocatable :: psi4d(:, :, :, :)
+
+! rg = 実空間グリッドの情報（s_rgrid型）
+! nb = 軌道数
+! icomm, myrank = MPIコミュニケータの情報
+! neig = 隣接ノードの情報
+
+! allocate(psi4d(上のrg%is_array:ie_arrayに範囲))
+
+
+call init_sendrecv_grid4d(srg, rg, nb, icomm, myrank, neig)
+call alloc_cache_real8(srg)
+
+do iter = 1, niter
+
+    ! psi4d = ...何らかのデータが代入される
+    call update_overlaps(srg, data4d)
+
+end do
+
+```
